@@ -2,21 +2,25 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to Hosmart receiver",
-        "description": "Connect directly to the receiver over your local network. The POP is stored in Home Assistant and is not sent to GitHub.",
+        "title": "Connect to Ho-Smart receiver",
+        "description": "Enter the receiver address and your Ho-Smart app credentials. Home Assistant uses the account once during setup to retrieve the receiver's local-control key, then communicates directly with the receiver on your LAN. Your Ho-Smart email and password are not saved.",
         "data": {
           "host": "Receiver IP address",
           "port": "Local control port",
-          "pop": "Local Control POP"
+          "username": "Ho-Smart account email",
+          "password": "Ho-Smart account password"
         }
       }
     },
     "error": {
-      "cannot_connect": "Could not connect to the receiver or read its local-control data.",
-      "invalid_auth": "Security1 authentication failed. Check the Local Control POP."
+      "cannot_connect": "Could not connect to the Ho-Smart receiver on the local network.",
+      "invalid_cloud_auth": "The Ho-Smart email or password was not accepted.",
+      "cloud_error": "Could not communicate with the Ho-Smart service during setup.",
+      "no_local_control_devices": "The Ho-Smart account did not return any devices with local-control credentials.",
+      "cannot_match_device": "The account devices could not be matched to this receiver. Verify the receiver IP address."
     },
     "abort": {
-      "already_configured": "This Hosmart receiver is already configured."
+      "already_configured": "This Ho-Smart receiver is already configured."
     }
   }
 }
