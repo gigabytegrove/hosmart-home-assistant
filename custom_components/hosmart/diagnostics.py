@@ -21,7 +21,8 @@ async def async_get_config_entry_diagnostics(
     if CONF_POP in entry_data:
         entry_data[CONF_POP] = "<redacted>"
 
-    tail = await hass.async_add_executor_job(recorder.tail_sync, 2000)
+    sample_tail = await hass.async_add_executor_job(recorder.tail_sync, 1000)
+    event_tail = await hass.async_add_executor_job(recorder.event_tail_sync, 5000)
 
     return redact(
         {
@@ -56,7 +57,9 @@ async def async_get_config_entry_diagnostics(
             "last_activity": coordinator.last_activity,
             "last_udp_time": coordinator.last_udp_time,
             "last_udp_source": coordinator.last_udp_source,
-            "debug_log_path": str(recorder.path),
-            "debug_log_tail": tail,
+            "sample_log_path": str(recorder.path),
+            "event_journal_path": str(recorder.event_path),
+            "recent_sample_records": sample_tail,
+            "event_journal": event_tail,
         }
     )
