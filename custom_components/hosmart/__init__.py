@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant
 from .client import HosmartClient
 from .const import (
     CONF_MODE,
+    CONF_NODE_ID,
     CONF_POP,
     CONF_USER_ID,
     DOMAIN,
