@@ -1,4 +1,4 @@
-"""Persistent structured debug capture for Hosmart development builds."""
+"""Persistent structured debug capture for Ho-Smart."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ _SENSITIVE_KEYS = {
     "accesstoken",
     "refresh_token",
     "refreshtoken",
+    "user_id",
 }
 
 _MAX_BYTES = 50 * 1024 * 1024
@@ -26,7 +27,7 @@ _BACKUPS = 4
 
 
 def redact(value: Any, key: str | None = None) -> Any:
-    """Recursively redact credentials while preserving diagnostic structure."""
+    """Recursively redact credentials/account identifiers."""
     if key is not None and key.lower() in _SENSITIVE_KEYS:
         if value in (None, ""):
             return value
@@ -44,12 +45,7 @@ def redact(value: Any, key: str | None = None) -> Any:
 
 
 class HosmartDebugRecorder:
-    """Append-only rotating JSONL recorder.
-
-    The sample log receives every poll. The event journal separately receives
-    every non-poll record so important changes survive even if high-frequency
-    sample files rotate.
-    """
+    """Append-only rotating JSONL recorder."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
         self.hass = hass
@@ -102,9 +98,6 @@ class HosmartDebugRecorder:
             self._rotate_path(self.path)
             self._append(self.path, encoded)
 
-            # Keep a second, compact journal of anything that is not a routine
-            # successful sample. This is the long-lived fallback for scarce
-            # real-world trigger opportunities.
             if kind != "poll_snapshot":
                 self._rotate_path(self.event_path)
                 self._append(self.event_path, encoded)

@@ -1,4 +1,4 @@
-"""Sensors for Hosmart receivers."""
+"""Sensors for Ho-Smart receivers."""
 
 from __future__ import annotations
 
@@ -24,9 +24,10 @@ from .entity import HosmartEntity
 
 @dataclass(frozen=True, kw_only=True)
 class HosmartSensorDescription(SensorEntityDescription):
-    """Describe a Hosmart sensor."""
+    """Describe a Ho-Smart sensor."""
 
     value_fn: Callable[[HosmartCoordinator], Any]
+    requires_local: bool = False
 
 
 def _last_activity_value(coordinator: HosmartCoordinator, key: str):
@@ -35,23 +36,34 @@ def _last_activity_value(coordinator: HosmartCoordinator, key: str):
     return coordinator.last_activity.get(key)
 
 
+def _udp_time_value(coordinator: HosmartCoordinator) -> str:
+    return (
+        coordinator.last_udp_time.isoformat()
+        if coordinator.last_udp_time is not None
+        else "Never observed"
+    )
+
+
 SENSORS = (
     HosmartSensorDescription(
         key="event",
         name="Event",
         icon="mdi:motion-sensor",
+        requires_local=True,
         value_fn=lambda c: c.receiver.get("Event"),
     ),
     HosmartSensorDescription(
         key="channel",
         name="Channel",
         icon="mdi:numeric",
+        requires_local=True,
         value_fn=lambda c: c.receiver.get("Channel"),
     ),
     HosmartSensorDescription(
         key="channel_name",
         name="Channel name",
         icon="mdi:label-outline",
+        requires_local=True,
         value_fn=lambda c: c.receiver.get("ChannelName"),
     ),
     HosmartSensorDescription(
@@ -71,6 +83,12 @@ SENSORS = (
         name="Last activity channel name",
         icon="mdi:label-outline",
         value_fn=lambda c: _last_activity_value(c, "channel_name"),
+    ),
+    HosmartSensorDescription(
+        key="last_activity_source",
+        name="Last activity source",
+        icon="mdi:source-branch",
+        value_fn=lambda c: c.last_activity_source,
     ),
     HosmartSensorDescription(
         key="last_activity_time",
@@ -93,6 +111,7 @@ SENSORS = (
         icon="mdi:update",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
+        requires_local=True,
         value_fn=lambda c: c.last_poll_time,
     ),
     HosmartSensorDescription(
@@ -101,36 +120,61 @@ SENSORS = (
         icon="mdi:counter",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
+        requires_local=True,
         value_fn=lambda c: c.poll_count,
     ),
     HosmartSensorDescription(
         key="change_count",
         name="Receiver change count",
         icon="mdi:swap-horizontal",
-        entity_registry_enabled_default=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        requires_local=True,
         value_fn=lambda c: c.change_count,
     ),
     HosmartSensorDescription(
         key="udp_packet_count",
         name="UDP packet count",
         icon="mdi:lan-connect",
-        entity_registry_enabled_default=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        requires_local=True,
         value_fn=lambda c: c.udp_packet_count,
     ),
     HosmartSensorDescription(
         key="last_udp_time",
         name="Last UDP packet time",
-        device_class=SensorDeviceClass.TIMESTAMP,
         icon="mdi:clock-fast",
-        entity_registry_enabled_default=True,
-        value_fn=lambda c: c.last_udp_time,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        requires_local=True,
+        value_fn=_udp_time_value,
     ),
     HosmartSensorDescription(
         key="last_udp_source",
         name="Last UDP packet source",
         icon="mdi:ip-network-outline",
-        entity_registry_enabled_default=True,
-        value_fn=lambda c: c.last_udp_source,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        requires_local=True,
+        value_fn=lambda c: c.last_udp_source or "Never observed",
+    ),
+    HosmartSensorDescription(
+        key="cloud_alert_count",
+        name="Cloud alert count",
+        icon="mdi:counter",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda c: c.cloud_alert_count,
+    ),
+    HosmartSensorDescription(
+        key="last_cloud_check",
+        name="Last cloud check",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:cloud-clock",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda c: c.last_cloud_check_time,
     ),
     HosmartSensorDescription(
         key="internal_battery",
@@ -138,18 +182,21 @@ SENSORS = (
         device_class=SensorDeviceClass.BATTERY,
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
+        requires_local=True,
         value_fn=lambda c: c.receiver.get("InternalBattery"),
     ),
     HosmartSensorDescription(
         key="volume",
         name="Volume",
         icon="mdi:volume-high",
+        requires_local=True,
         value_fn=lambda c: c.receiver.get("Volume"),
     ),
     HosmartSensorDescription(
         key="child_device_count",
         name="Child device count",
         icon="mdi:counter",
+        requires_local=True,
         value_fn=lambda c: c.receiver.get("ChildDeviceCount"),
     ),
 )
@@ -160,15 +207,17 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Hosmart sensors."""
+    """Set up Ho-Smart sensors."""
     coordinator: HosmartCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     async_add_entities(
-        HosmartSensor(coordinator, description) for description in SENSORS
+        HosmartSensor(coordinator, description)
+        for description in SENSORS
+        if not description.requires_local or coordinator.local_enabled
     )
 
 
 class HosmartSensor(HosmartEntity, SensorEntity):
-    """A Hosmart sensor."""
+    """A Ho-Smart sensor."""
 
     entity_description: HosmartSensorDescription
 
