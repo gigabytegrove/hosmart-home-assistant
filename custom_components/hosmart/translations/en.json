@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Hosmart receiver",
+        "description": "Connect directly to the receiver over your local network. The POP is stored in Home Assistant and is not sent to GitHub.",
+        "data": {
+          "host": "Receiver IP address",
+          "port": "Local control port",
+          "pop": "Local Control POP"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the receiver or read its local-control data.",
+      "invalid_auth": "Security1 authentication failed. Check the Local Control POP."
+    },
+    "abort": {
+      "already_configured": "This Hosmart receiver is already configured."
+    }
+  }
+}
