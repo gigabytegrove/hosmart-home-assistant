@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- Fixed startup failure in v0.2.1 caused by a missing `CONF_NODE_ID` import in `__init__.py`.
+- Restores normal config-entry setup so existing Ho-Smart receivers can complete initialization and entities can come online.
+- No credential or configuration reset is required.
+
 ## 0.2.1
 
 - Fixed a v0.2.0 availability regression where an unexpected Ho-Smart cloud/history failure could mark the whole coordinator unavailable in Hybrid mode.
