@@ -3,10 +3,11 @@
     "step": {
       "user": {
         "title": "Connect to Ho-Smart receiver",
-        "description": "Enter the receiver address and your Ho-Smart app credentials. Home Assistant uses the account once during setup to retrieve the receiver's local-control key, then communicates directly with the receiver on your LAN. Your Ho-Smart email and password are not saved.",
+        "description": "Enter the receiver address and your Ho-Smart app credentials. Home Assistant uses the account during setup to retrieve the receiver's local-control key and cloud identity. Your Ho-Smart email and password are not saved.",
         "data": {
           "host": "Receiver IP address",
           "port": "Local control port",
+          "connection_mode": "Connection mode",
           "username": "Ho-Smart account email",
           "password": "Ho-Smart account password"
         }
@@ -15,12 +16,36 @@
     "error": {
       "cannot_connect": "Could not connect to the Ho-Smart receiver on the local network.",
       "invalid_cloud_auth": "The Ho-Smart email or password was not accepted.",
-      "cloud_error": "Could not communicate with the Ho-Smart service during setup.",
-      "no_local_control_devices": "The Ho-Smart account did not return any devices with local-control credentials.",
+      "cloud_error": "Could not communicate with the Ho-Smart service.",
+      "no_devices": "The Ho-Smart account did not return any receivers.",
       "cannot_match_device": "The account devices could not be matched to this receiver. Verify the receiver IP address."
     },
     "abort": {
       "already_configured": "This Ho-Smart receiver is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ho-Smart connection mode",
+        "description": "Choose how Home Assistant should use this receiver. Hybrid uses local Security1 for receiver state and Ho-Smart cloud history for alarm events. Local only never uses the cloud at runtime. Cloud alarm mode uses Ho-Smart alarm history without local polling.",
+        "data": {
+          "connection_mode": "Connection mode"
+        }
+      },
+      "cloud_credentials": {
+        "title": "Enable Ho-Smart cloud alarms",
+        "description": "This existing entry was created before cloud alarm support. Enter your Ho-Smart app credentials once so Home Assistant can retrieve the account user ID. The email, password and access token are not stored.",
+        "data": {
+          "username": "Ho-Smart account email",
+          "password": "Ho-Smart account password"
+        }
+      }
+    },
+    "error": {
+      "invalid_cloud_auth": "The Ho-Smart email or password was not accepted.",
+      "cloud_error": "Could not communicate with the Ho-Smart service.",
+      "cannot_match_device": "This Ho-Smart account does not contain the receiver already configured in Home Assistant."
     }
   }
 }

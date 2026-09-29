@@ -4,160 +4,158 @@
 
 # Ho-Smart for Home Assistant
 
-Local Home Assistant integration for supported Ho-Smart / Hosmart / eMACROS driveway alarm receivers using the ESP RainMaker local-control protocol.
+Home Assistant integration for supported Ho-Smart / Hosmart / eMACROS driveway-alarm receivers. The verified HS006W implementation combines ESP RainMaker Security1 local control with the Ho-Smart alarm-history path discovered in the My Hosmart Android app.
 
-> **Development status:** early field-test build. The initial target is the HS006W / ESP32-C6 receiver using Security1 local control. During setup, the integration signs in to the user's Ho-Smart account once to retrieve the receiver's local-control key (POP). The Ho-Smart email/password are not saved, and normal runtime communication is local.
+## Connection modes
 
-## Current features
+The integration supports three selectable runtime modes:
 
-- Local-only runtime communication with the receiver
-- ESP Local Control Security1 (X25519 + AES-256-CTR)
-- High-frequency development polling at **4 Hz** for short-lived event capture
-- Passive UDP/50001 listener
-- Every successful poll written to a persistent rotating JSONL capture
-- Every receiver-field change written separately with previous/current values
-- Every UDP/50001 datagram captured before filtering, including raw text/hex
-- Poll errors and UDP listener errors preserved
-- Raw event, channel, and channel-name sensors
-- Persistent "last activity" sensors so a brief alarm remains inspectable after it clears
-- Poll/change/UDP counters and last-seen timestamps
-- Receiver battery, volume, child-device count, power, charging, and zone armed-state entities
-- Fires `hosmart_activity` whenever `Event`, `Channel`, or `ChannelName` changes
-- Fires `hosmart_udp_packet` for every UDP/50001 datagram received
-- Home Assistant diagnostics support with a redacted recent capture tail
+- **Hybrid** — local Security1 receiver state plus Ho-Smart cloud alarm events. This is the default and provides the fullest verified functionality.
+- **Local only** — local receiver state/control transport only. No Ho-Smart cloud calls occur after setup. The HS006W driveway alarm itself is not exposed by the receiver's local `params` property, so alarm events are not currently available in this mode.
+- **Cloud alarm mode** — Ho-Smart alarm history without continuous local polling. Intended for users who only need alarm/activity events.
 
-The development capture intentionally logs far more than a normal production integration. The receiver POP and other credential-like fields are redacted from the persistent debug capture.
+The account email/password are used during setup only. They are **not stored**. Runtime cloud alarm checks use the account `user_id` returned by the exact My Hosmart 1.4.9.3 flow; access tokens and passwords are discarded.
 
-## HACS installation
+## Verified HS006W behavior
 
-This repository is intended to be installed as a HACS custom integration.
+Reverse engineering and live field tests established:
 
-1. Open **HACS**.
-2. Open the menu and choose **Custom repositories**.
-3. Add:
-   - Repository: `https://github.com/gigabytegrove/hosmart-home-assistant`
-   - Type: **Integration**
-4. Find **Hosmart Home Assistant** in HACS and download it.
-5. Restart Home Assistant.
-6. Go to **Settings → Devices & services → Add integration**.
-7. Search for **Hosmart**.
-8. Enter the receiver IP address, local-control port, and your **Ho-Smart app account email/password**.
+- Receiver: HS006W / ESP32-C6, firmware `2.0`
+- ESP Local Control `v1.0`
+- TCP/8080
+- Security Type `1`
+- X25519 + AES-256-CTR Security1 session
+- Receiver-specific 8-character POP
+- Local properties: `config` and `params`
+- Local state is genuinely live; physical volume changes were observed immediately through local control
+- Driveway alarm events do **not** alter the local `params` object
+- Two independently triggered real driveway alarms produced no local field changes and no UDP/50001 datagrams, while Ho-Smart history recorded both as `Alert! <receiver> Reported Driveway:Alarm`
+- My Hosmart's native local notification server listens on UDP/50001; it does not perform a registration handshake before binding. The listener remains supported as a diagnostic/local hint, but the tested HS006W did not emit those datagrams during the two proven alarm events.
 
-The integration uses those credentials only during onboarding to call Ho-Smart's device API, retrieve the receiver's Local Control metadata, and identify the POP that actually authenticates to the receiver. The account email/password are **not stored** in the Home Assistant config entry. Only the receiver address, port, and local-control POP are retained for local runtime communication.
+## Alarm behavior
 
-For the verified HS006W receiver the local-control port is `8080` and Local Control Type is `1`. Users do not need to know or manually enter the POP.
-
-## Field-test capture
-
-The first field-test version is intentionally designed around one-off real-world events that may be inconvenient to reproduce.
-
-Every successful local state read is appended to the high-frequency sample log:
+Hybrid/cloud mode polls the same Ho-Smart notice endpoint used by My Hosmart. A real alert such as:
 
 ```text
-<HA config>/hosmart_debug/hosmart_<config-entry-id>.jsonl
+Alert! GG Sensor Reported Driveway:Alarm
 ```
 
-Every non-routine record is also copied into a separate long-lived event journal:
+is parsed into:
 
-```text
-<HA config>/hosmart_debug/hosmart_<config-entry-id>_events.jsonl
-```
+- Event: `Alarm`
+- Channel name: `Driveway`
+- Channel number: resolved by matching the local/configured channel names (for example, Driveway → Channel 1)
+- Activity timestamp: the receiver/cloud event's `msgtime`, not the later polling time
+- Source: `cloud`
 
-Both are structured JSON Lines and rotate at approximately 50 MiB with four rotated copies. The sample log records the complete live `params` object on every 4 Hz poll. Static `config` is recorded once and again only if it changes, avoiding needless repetition while preserving all state. The event journal preserves all field changes, complete parameter changes, UDP datagrams, errors, startup/shutdown records, and event transitions separately from routine polls.
+The integration de-duplicates notices by Ho-Smart's `delkey` when available.
 
-Captured record types include:
+On startup, Hybrid/cloud mode reads recent history so the **Last activity** entities are populated immediately instead of remaining unavailable until the next vehicle passes.
 
-- `integration_start`
-- `poll_snapshot`
-- `params_changed`
-- `receiver_fields_changed`
-- `event_baseline`
-- `event_tuple_changed`
-- `poll_error`
-- `poll_unexpected_error`
-- `udp_listener_started`
-- `udp_listener_error`
-- `udp_50001_datagram`
-- `integration_stop`
+## Entities
 
-Each `poll_snapshot` includes the full live `params` structure, with the POP redacted. `config_snapshot` preserves the full static receiver configuration whenever it changes. This is deliberate for the initial reverse-engineering phase.
+Primary entities include:
 
-Home Assistant's integration diagnostics include current state, counters, the newest 1,000 sample records, and up to 5,000 event-journal records.
+- **Driveway alarm** — binary motion/alarm entity; active briefly after a newly observed alarm
+- Event
+- Channel
+- Channel name
+- Last activity event
+- Last activity channel
+- Last activity channel name
+- Last activity source
+- Last activity time
+- Last event change
+- Internal battery
+- Volume
+- Child device count
+- Power
+- Internal charging
+- Zone 1–4 armed states
 
-## What to watch during a real driveway pass
+Diagnostic entities are disabled by default:
 
-The live values currently under investigation are:
+- Last poll time
+- Poll count
+- Receiver change count
+- UDP packet count
+- Last UDP packet source
+- Last UDP packet time
+- Cloud alert count
+- Last cloud check
 
-- `Event`
-- `Channel`
-- `ChannelName`
+The UDP last-seen diagnostics report `Never observed` until a datagram is actually received; they no longer appear as unexplained empty production entities by default.
 
-The integration does **not** assume what values mean "motion" or "alarm." The initial field test preserves raw evidence first.
+## Home Assistant events
 
-Useful entities include:
-
-- `sensor.<device>_event`
-- `sensor.<device>_channel`
-- `sensor.<device>_channel_name`
-- `sensor.<device>_last_activity_event`
-- `sensor.<device>_last_activity_channel`
-- `sensor.<device>_last_activity_channel_name`
-- `sensor.<device>_last_activity_time`
-- `sensor.<device>_last_event_change`
-- `sensor.<device>_last_poll_time` *(diagnostic; disabled by default because it changes four times per second)*
-- `sensor.<device>_poll_count` *(diagnostic; disabled by default because it changes four times per second)*
-- `sensor.<device>_receiver_change_count`
-- `sensor.<device>_udp_packet_count`
-- `sensor.<device>_last_udp_packet_time`
-- `sensor.<device>_last_udp_packet_source`
-
-You can also listen for these events in **Developer Tools → Events**:
+The integration fires:
 
 ```text
 hosmart_activity
+hosmart_alert
 hosmart_udp_packet
 ```
 
-## Verified hardware and protocol
+`hosmart_alert` is fired for newly observed alarm records. Event data includes the node, receiver name, event, channel, channel name, activity timestamp, source, message and record key.
 
-Initial verified target:
+## Polling
 
-- Hosmart/eMACROS HS006W
-- ESP32-C6
-- firmware reported as `2.0`
-- ESP Local Control `v1.0`
-- Local Control Security Type `1`
-- TCP/8080
-- Security1 X25519 + AES-256-CTR
-- receiver-specific 8-byte POP
-- two local properties: `config` and `params`
+The initial reverse-engineering build polled local state at 4 Hz so a short-lived parameter transition would not be missed. Live field tests proved that HS006W alarm events are not represented in the local `params` stream, so production local polling is now **5 seconds**.
 
-Additional devices may use the same protocol, but should not be treated as verified until tested.
+Hybrid/cloud alarm history checks run every **3 seconds**. In the verified two-pass field test, Ho-Smart history exposed the alarms roughly three seconds after their recorded trigger timestamps.
+
+## Existing installations
+
+Entries created before v0.2.0 contain the local POP but not the Ho-Smart `user_id`.
+
+After updating:
+
+1. Open **Settings → Devices & services → Ho-Smart**.
+2. Select **Configure**.
+3. Choose **Hybrid**.
+4. Enter the My Hosmart email/password once when prompted.
+
+Home Assistant retrieves the account `user_id`, verifies that the account contains the already-configured node, discards the credentials/token, reloads the integration, and backfills the latest activity from alarm history.
+
+## HACS installation
+
+1. Open **HACS**.
+2. Add `https://github.com/gigabytegrove/hosmart-home-assistant` as a custom **Integration** repository.
+3. Download **Ho-Smart for Home Assistant**.
+4. Restart Home Assistant.
+5. Go to **Settings → Devices & services → Add integration**.
+6. Search for **Ho-Smart**.
+7. Enter the receiver IP, port (verified default `8080`), desired connection mode, and My Hosmart account credentials.
+
+Users do not need to locate or manually enter the Local Control POP.
 
 ## Runtime architecture
 
 ```text
-HS006W receiver
-  ├─ TCP/8080
-  │   ├─ /esp_local_ctrl/session
-  │   └─ /esp_local_ctrl/control
-  │
-  └─ UDP/50001 (local notification hint, when visible)
-          │
-          ▼
-Home Assistant
-          │
-          ├─ entities/events
-          └─ persistent redacted JSONL field-test capture
+                         ┌──────────────────────────────┐
+                         │       Ho-Smart cloud         │
+                         │ notice/query/page alarm log  │
+                         └──────────────┬───────────────┘
+                                        │ Hybrid / Cloud
+                                        ▼
+HS006W receiver ── Security1 TCP/8080 ──► Home Assistant
+      │                 Local / Hybrid       │
+      │                                      ├─ Driveway alarm
+      └─ UDP/50001 listener (diagnostic)     ├─ state entities
+                                             └─ HA events
 ```
 
-## Security
+## Security and diagnostics
 
-The receiver's POP (Proof of Possession) is the per-device key used by ESP Security1 to authenticate local-control sessions. It is **not something the user should have to locate or type manually**. During setup, the integration retrieves it from the user's Ho-Smart account, verifies it against the receiver, and stores only that device key for future local access.
+The receiver POP is stored because it is required for local Security1 sessions. The Ho-Smart account password and access token are never persisted. The account `user_id`, POP, password/token-shaped fields and other credentials are redacted from integration diagnostics and JSONL debug records.
 
-The Ho-Smart account email/password are onboarding-only and are not persisted by this integration. The development debug recorder redacts `POP`, password, and token-shaped fields before writing JSONL diagnostics.
+Structured logs are stored under:
 
-Do not publish a receiver POP if you obtain one separately.
+```text
+<HA config>/hosmart_debug/
+```
+
+Routine local snapshots and a separate event journal are rotated automatically.
 
 ## License
 
