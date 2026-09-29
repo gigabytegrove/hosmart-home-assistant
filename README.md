@@ -1,62 +1,89 @@
 <p align="center">
-  <img src="logo.png" alt="Ho-Smart" width="560">
+  <img src="logo.png" alt="Ho-Smart for Home Assistant" width="560">
 </p>
 
 # Ho-Smart for Home Assistant
 
-Home Assistant integration for supported Ho-Smart / Hosmart / eMACROS driveway-alarm receivers. The verified HS006W implementation combines ESP RainMaker Security1 local control with the Ho-Smart alarm-history path discovered in the My Hosmart Android app.
+Bring supported Ho-Smart driveway alarm receivers into Home Assistant with local receiver status, alarm history, and automation-friendly entities.
+
+The integration is currently verified with the **Ho-Smart HS006W** receiver running firmware **2.0**.
+
+## What it does
+
+Ho-Smart for Home Assistant can provide:
+
+- Driveway alarm activity
+- Receiver power state
+- Volume
+- Internal battery level
+- Channel and zone information
+- Zone 1–4 armed states
+- Last alarm/activity details
+- Home Assistant events for automations
+- Local receiver status even if the Ho-Smart cloud is temporarily unavailable
+
+For the HS006W, the receiver exposes normal status locally but does not expose driveway alarm events through its local status data. Because of that, **Hybrid mode** combines local receiver data with Ho-Smart alarm history and is the recommended setup.
+
+## Current stable version
+
+**v0.2.2** is the current known-good baseline for the verified HS006W setup.
+
+It fixes the startup and availability problems found in earlier v0.2 releases while keeping local and cloud operation independent in Hybrid mode.
+
+## Installation with HACS
+
+1. Open **HACS** in Home Assistant.
+2. Add this repository as a custom **Integration** repository:
+   `https://github.com/gigabytegrove/hosmart-home-assistant`
+3. Install **Ho-Smart for Home Assistant**.
+4. Restart Home Assistant.
+5. Go to **Settings → Devices & services → Add integration**.
+6. Search for **Ho-Smart**.
+7. Follow the setup prompts.
+
+## Setup
+
+You will be asked for:
+
+- **Receiver IP address**
+- **Receiver port** — the verified HS006W default is `8080`
+- **Connection mode**
+- **My Hosmart account email and password** when using Hybrid or Cloud mode
+
+You do **not** need to locate or manually enter the receiver's Local Control POP. The integration obtains the information it needs during setup.
+
+Your My Hosmart email and password are used during setup and are **not stored** by the integration.
 
 ## Connection modes
 
-The integration supports three selectable runtime modes:
+### Hybrid — recommended
 
-- **Hybrid** — local Security1 receiver state plus Ho-Smart cloud alarm events. This is the default and provides the fullest verified functionality.
-- **Local only** — local receiver state/control transport only. No Ho-Smart cloud calls occur after setup. The HS006W driveway alarm itself is not exposed by the receiver's local `params` property, so alarm events are not currently available in this mode.
-- **Cloud alarm mode** — Ho-Smart alarm history without continuous local polling. Intended for users who only need alarm/activity events.
+Uses:
 
-The account email/password are used during setup only. They are **not stored**. Runtime cloud alarm checks use the account `user_id` returned by the exact My Hosmart 1.4.9.3 flow; access tokens and passwords are discarded.
+- Local communication for receiver status
+- Ho-Smart alarm history for driveway alarm events
 
-## Verified HS006W behavior
+This provides the fullest verified HS006W functionality and keeps local receiver entities available if the Ho-Smart alarm-history service has a temporary problem.
 
-Reverse engineering and live field tests established:
+### Local only
 
-- Receiver: HS006W / ESP32-C6, firmware `2.0`
-- ESP Local Control `v1.0`
-- TCP/8080
-- Security Type `1`
-- X25519 + AES-256-CTR Security1 session
-- Receiver-specific 8-character POP
-- Local properties: `config` and `params`
-- Local state is genuinely live; physical volume changes were observed immediately through local control
-- Driveway alarm events do **not** alter the local `params` object
-- Two independently triggered real driveway alarms produced no local field changes and no UDP/50001 datagrams, while Ho-Smart history recorded both as `Alert! <receiver> Reported Driveway:Alarm`
-- My Hosmart's native local notification server listens on UDP/50001; it does not perform a registration handshake before binding. The listener remains supported as a diagnostic/local hint, but the tested HS006W did not emit those datagrams during the two proven alarm events.
+Uses only the receiver on your local network.
 
-## Alarm behavior
+This mode provides local receiver status and avoids Ho-Smart cloud calls after setup.
 
-Hybrid/cloud mode polls the same Ho-Smart notice endpoint used by My Hosmart. A real alert such as:
+**Important:** on the verified HS006W, driveway alarm events are not exposed in the receiver's local status data. That means the driveway alarm entity cannot currently receive proven alarm events in Local-only mode.
 
-```text
-Alert! GG Sensor Reported Driveway:Alarm
-```
+### Cloud alarm mode
 
-is parsed into:
+Uses Ho-Smart alarm history without continuously polling the receiver locally.
 
-- Event: `Alarm`
-- Channel name: `Driveway`
-- Channel number: resolved by matching the local/configured channel names (for example, Driveway → Channel 1)
-- Activity timestamp: the receiver/cloud event's `msgtime`, not the later polling time
-- Source: `cloud`
-
-The integration de-duplicates notices by Ho-Smart's `delkey` when available.
-
-On startup, Hybrid/cloud mode reads recent history so the **Last activity** entities are populated immediately instead of remaining unavailable until the next vehicle passes.
+This is intended for users who only need alarm/activity information.
 
 ## Entities
 
-Primary entities include:
+The exact entity list can vary as support expands, but the verified HS006W exposes these primary entities:
 
-- **Driveway alarm** — binary motion/alarm entity; active briefly after a newly observed alarm
+- **Driveway alarm**
 - Event
 - Channel
 - Channel name
@@ -71,24 +98,18 @@ Primary entities include:
 - Child device count
 - Power
 - Internal charging
-- Zone 1–4 armed states
+- Zone 1 armed
+- Zone 2 armed
+- Zone 3 armed
+- Zone 4 armed
 
-Diagnostic entities are disabled by default:
+Several troubleshooting and diagnostic entities are also available but are disabled by default so normal installations stay uncluttered.
 
-- Last poll time
-- Poll count
-- Receiver change count
-- UDP packet count
-- Last UDP packet source
-- Last UDP packet time
-- Cloud alert count
-- Last cloud check
+## Using alarms in automations
 
-The UDP last-seen diagnostics report `Never observed` until a datagram is actually received; they no longer appear as unexplained empty production entities by default.
+The **Driveway alarm** binary sensor becomes active briefly when a newly observed alarm is detected.
 
-## Home Assistant events
-
-The integration fires:
+The integration also fires Home Assistant events:
 
 ```text
 hosmart_activity
@@ -96,72 +117,149 @@ hosmart_alert
 hosmart_udp_packet
 ```
 
-`hosmart_alert` is fired for newly observed alarm records. Event data includes the node, receiver name, event, channel, channel name, activity timestamp, source, message and record key.
+For most automations, use the **Driveway alarm** entity or the `hosmart_alert` event.
+
+Alarm event data can include:
+
+- Receiver name
+- Event type
+- Channel number
+- Channel name
+- Activity time
+- Source
+- Original Ho-Smart message
+- Record key
+
+## How alarm detection works
+
+The verified HS006W reports normal receiver information locally, including power, volume, battery, channel names, and armed-zone state.
+
+During live testing, real driveway alarms did **not** appear in the receiver's local status values. They did appear in the same Ho-Smart alarm history used by the My Hosmart app.
+
+Hybrid mode therefore uses:
+
+- Local receiver communication for normal status
+- Ho-Smart alarm history for actual driveway alerts
+
+This is why Hybrid mode is the recommended configuration.
+
+On startup, recent alarm history is loaded so the **Last activity** entities can show meaningful information immediately. Historical alarms are not treated as new alarms.
 
 ## Polling
 
-The initial reverse-engineering build polled local state at 4 Hz so a short-lived parameter transition would not be missed. Live field tests proved that HS006W alarm events are not represented in the local `params` stream, so production local polling is now **5 seconds**.
+Production polling is intentionally modest:
 
-Hybrid/cloud alarm history checks run every **3 seconds**. In the verified two-pass field test, Ho-Smart history exposed the alarms roughly three seconds after their recorded trigger timestamps.
+- Local receiver status: approximately every **5 seconds**
+- Ho-Smart alarm history in Hybrid/Cloud mode: approximately every **3 seconds**
 
-## Upgrade notes
-
-### v0.2.1
-
-v0.2.1 fixes the v0.2.0 Hybrid-mode availability regression. A failure in the Ho-Smart history service no longer takes healthy local receiver entities offline. Existing pre-v0.2.0 entries are also backfilled with their node ID after the next successful local refresh.
+The faster development polling used during reverse engineering is not used in normal releases.
 
 ## Existing installations
 
-Entries created before v0.2.0 contain the local POP but not the Ho-Smart `user_id`.
+If you installed a version before v0.2.0, your existing entry may contain only the local receiver information.
 
-After updating:
+To enable Hybrid mode:
 
-1. Open **Settings → Devices & services → Ho-Smart**.
+1. Go to **Settings → Devices & services → Ho-Smart**.
 2. Select **Configure**.
 3. Choose **Hybrid**.
-4. Enter the My Hosmart email/password once when prompted.
+4. Enter your My Hosmart email and password when prompted.
 
-Home Assistant retrieves the account `user_id`, verifies that the account contains the already-configured node, discards the credentials/token, reloads the integration, and backfills the latest activity from alarm history.
+The credentials are used to connect the existing receiver entry to the correct Ho-Smart account and are then discarded.
 
-## HACS installation
+## Privacy and security
 
-1. Open **HACS**.
-2. Add `https://github.com/gigabytegrove/hosmart-home-assistant` as a custom **Integration** repository.
-3. Download **Ho-Smart for Home Assistant**.
-4. Restart Home Assistant.
-5. Go to **Settings → Devices & services → Add integration**.
-6. Search for **Ho-Smart**.
-7. Enter the receiver IP, port (verified default `8080`), desired connection mode, and My Hosmart account credentials.
+The integration stores the receiver information required for local communication.
 
-Users do not need to locate or manually enter the Local Control POP.
+The following are **not persisted**:
 
-## Runtime architecture
+- My Hosmart account password
+- Ho-Smart access token
 
-```text
-                         ┌──────────────────────────────┐
-                         │       Ho-Smart cloud         │
-                         │ notice/query/page alarm log  │
-                         └──────────────┬───────────────┘
-                                        │ Hybrid / Cloud
-                                        ▼
-HS006W receiver ── Security1 TCP/8080 ──► Home Assistant
-      │                 Local / Hybrid       │
-      │                                      ├─ Driveway alarm
-      └─ UDP/50001 listener (diagnostic)     ├─ state entities
-                                             └─ HA events
-```
+Sensitive values are redacted from Home Assistant diagnostics and the integration's structured debug records.
 
-## Security and diagnostics
+If you share logs or diagnostics in a GitHub issue, review them first and remove anything you consider private.
 
-The receiver POP is stored because it is required for local Security1 sessions. The Ho-Smart account password and access token are never persisted. The account `user_id`, POP, password/token-shaped fields and other credentials are redacted from integration diagnostics and JSONL debug records.
+## Troubleshooting
 
-Structured logs are stored under:
+### Everything is unavailable
+
+Confirm that:
+
+- You are running the current release.
+- Home Assistant can reach the receiver IP and port.
+- The receiver IP has not changed.
+- Hybrid/Cloud setup completed successfully.
+
+Then restart Home Assistant and check **Settings → System → Logs** for entries containing `hosmart`.
+
+### Local entities work but alarms do not
+
+If you are using **Local only**, this is expected on the verified HS006W because real driveway alarm events are not exposed by its local status interface.
+
+Use **Hybrid** mode for verified alarm reporting.
+
+### Alarm history works but local receiver entities do not
+
+Check network access between Home Assistant and the receiver. The verified HS006W uses TCP port `8080`.
+
+### Need to report a problem?
+
+Open a GitHub issue and include:
+
+- Ho-Smart integration version
+- Home Assistant version
+- Receiver model and firmware
+- Connection mode
+- What you expected
+- What actually happened
+- Relevant sanitized logs or diagnostics
+
+Do not include passwords, tokens, private keys, or other secrets.
+
+See [SUPPORT.md](SUPPORT.md) for more information.
+
+## Supported hardware
+
+### Verified
+
+| Device | Firmware | Status |
+| --- | --- | --- |
+| Ho-Smart HS006W | 2.0 | Verified |
+
+Other Ho-Smart, Hosmart, or eMACROS receivers may share similar hardware or protocols, but they should not be considered supported until they have been tested.
+
+If you have another model and want support added, open a device support request with the exact model and firmware.
+
+## Technical details
+
+These details are mainly useful for contributors and troubleshooting.
+
+The verified HS006W uses:
+
+- ESP32-C6
+- ESP RainMaker Local Control v1.0
+- TCP port 8080
+- Security Type 1
+- X25519 key exchange
+- AES-256-CTR session encryption
+- Receiver-specific 8-character Local Control POP
+
+The integration also listens on UDP port `50001` because the My Hosmart app uses a local UDP notification listener. In verified HS006W testing, real driveway alarms did not produce usable UDP alarm packets, so UDP is treated as diagnostic rather than the primary alarm source.
+
+Structured integration logs are stored under:
 
 ```text
 <HA config>/hosmart_debug/
 ```
 
-Routine local snapshots and a separate event journal are rotated automatically.
+These logs are rotated automatically.
+
+## Project status
+
+The integration is built around behavior verified on real hardware rather than assumed compatibility.
+
+**v0.2.2 is the current stable baseline.** Future changes should preserve the working local and Hybrid behavior unless testing proves a change is necessary.
 
 ## License
 
