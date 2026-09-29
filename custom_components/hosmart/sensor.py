@@ -28,6 +28,12 @@ class HosmartSensorDescription(SensorEntityDescription):
     value_fn: Callable[[HosmartCoordinator], Any]
 
 
+def _last_activity_value(coordinator: HosmartCoordinator, key: str):
+    if coordinator.last_activity is None:
+        return None
+    return coordinator.last_activity.get(key)
+
+
 SENSORS = (
     HosmartSensorDescription(
         key="event",
@@ -48,6 +54,38 @@ SENSORS = (
         value_fn=lambda c: c.receiver.get("ChannelName"),
     ),
     HosmartSensorDescription(
+        key="last_activity_event",
+        name="Last activity event",
+        icon="mdi:motion-sensor",
+        value_fn=lambda c: _last_activity_value(c, "event"),
+    ),
+    HosmartSensorDescription(
+        key="last_activity_channel",
+        name="Last activity channel",
+        icon="mdi:numeric",
+        value_fn=lambda c: _last_activity_value(c, "channel"),
+    ),
+    HosmartSensorDescription(
+        key="last_activity_channel_name",
+        name="Last activity channel name",
+        icon="mdi:label-outline",
+        value_fn=lambda c: _last_activity_value(c, "channel_name"),
+    ),
+    HosmartSensorDescription(
+        key="last_activity_time",
+        name="Last activity time",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:clock-check-outline",
+        value_fn=lambda c: c.last_activity_time,
+    ),
+    HosmartSensorDescription(
+        key="last_event_change",
+        name="Last event change",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:clock-outline",
+        value_fn=lambda c: c.last_event_change,
+    ),
+    HosmartSensorDescription(
         key="internal_battery",
         name="Internal battery",
         device_class=SensorDeviceClass.BATTERY,
@@ -66,13 +104,6 @@ SENSORS = (
         name="Child device count",
         icon="mdi:counter",
         value_fn=lambda c: c.receiver.get("ChildDeviceCount"),
-    ),
-    HosmartSensorDescription(
-        key="last_event_change",
-        name="Last event change",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        icon="mdi:clock-outline",
-        value_fn=lambda c: c.last_event_change,
     ),
 )
 
