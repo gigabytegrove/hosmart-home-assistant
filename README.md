@@ -104,6 +104,12 @@ The initial reverse-engineering build polled local state at 4 Hz so a short-live
 
 Hybrid/cloud alarm history checks run every **3 seconds**. In the verified two-pass field test, Ho-Smart history exposed the alarms roughly three seconds after their recorded trigger timestamps.
 
+## Upgrade notes
+
+### v0.2.1
+
+v0.2.1 fixes the v0.2.0 Hybrid-mode availability regression. A failure in the Ho-Smart history service no longer takes healthy local receiver entities offline. Existing pre-v0.2.0 entries are also backfilled with their node ID after the next successful local refresh.
+
 ## Existing installations
 
 Entries created before v0.2.0 contain the local POP but not the Ho-Smart `user_id`.
