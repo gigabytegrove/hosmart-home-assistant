@@ -1,32 +1,80 @@
 name: Bug report
-description: Report a reproducible problem
+description: Report a problem with Ho-Smart for Home Assistant
 title: "[Bug]: "
 labels: ["bug"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please provide enough detail for the issue to be reproduced.
+
+        Do not include passwords, tokens, private keys, or other secrets.
+
   - type: input
     id: version
-    attributes: {label: Integration version}
-    validations: {required: true}
+    attributes:
+      label: Ho-Smart integration version
+      placeholder: "0.2.2"
+    validations:
+      required: true
+
   - type: input
     id: ha
-    attributes: {label: Home Assistant version}
-    validations: {required: true}
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.5.1"
+    validations:
+      required: true
+
   - type: input
     id: device
-    attributes: {label: Device model and firmware}
-    validations: {required: true}
+    attributes:
+      label: Receiver model and firmware
+      placeholder: "HS006W, firmware 2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Connection mode
+      options:
+        - Hybrid
+        - Local only
+        - Cloud alarm mode
+        - Not sure
+    validations:
+      required: true
+
   - type: textarea
     id: problem
-    attributes: {label: What happened?}
-    validations: {required: true}
+    attributes:
+      label: What happened?
+      description: Describe the problem in plain language.
+    validations:
+      required: true
+
   - type: textarea
     id: expected
-    attributes: {label: Expected behavior}
-    validations: {required: true}
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
   - type: textarea
     id: reproduce
-    attributes: {label: Reproduction steps}
-    validations: {required: true}
+    attributes:
+      label: Steps to reproduce
+      description: List the steps that reliably cause the problem.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. See ...
+    validations:
+      required: true
+
   - type: textarea
     id: logs
-    attributes: {label: Relevant sanitized logs}
+    attributes:
+      label: Relevant sanitized logs or diagnostics
+      description: Remove passwords, tokens, private keys, and personal information before posting.
