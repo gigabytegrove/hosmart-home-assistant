@@ -47,18 +47,25 @@ The POP is a device credential. Do not publish it in issues, screenshots, logs, 
 
 The first field-test version is intentionally designed around one-off real-world events that may be inconvenient to reproduce.
 
-Every successful local state read is appended to:
+Every successful local state read is appended to the high-frequency sample log:
 
 ```text
 <HA config>/hosmart_debug/hosmart_<config-entry-id>.jsonl
 ```
 
-The file is structured JSON Lines. It rotates at approximately 50 MiB and keeps four rotated copies in addition to the active file, limiting the capture set to roughly 250 MiB.
+Every non-routine record is also copied into a separate long-lived event journal:
+
+```text
+<HA config>/hosmart_debug/hosmart_<config-entry-id>_events.jsonl
+```
+
+Both are structured JSON Lines and rotate at approximately 50 MiB with four rotated copies. The sample log records the complete live `params` object on every 4 Hz poll. Static `config` is recorded once and again only if it changes, avoiding needless repetition while preserving all state. The event journal preserves all field changes, complete parameter changes, UDP datagrams, errors, startup/shutdown records, and event transitions separately from routine polls.
 
 Captured record types include:
 
 - `integration_start`
 - `poll_snapshot`
+- `params_changed`
 - `receiver_fields_changed`
 - `event_baseline`
 - `event_tuple_changed`
@@ -69,9 +76,9 @@ Captured record types include:
 - `udp_50001_datagram`
 - `integration_stop`
 
-Each `poll_snapshot` includes the full locally returned `config` and `params` structures, with the POP redacted. This is deliberate for the initial reverse-engineering phase.
+Each `poll_snapshot` includes the full live `params` structure, with the POP redacted. `config_snapshot` preserves the full static receiver configuration whenever it changes. This is deliberate for the initial reverse-engineering phase.
 
-Home Assistant's integration diagnostics also include current state, counters, and the newest 2,000 structured capture records.
+Home Assistant's integration diagnostics include current state, counters, the newest 1,000 sample records, and up to 5,000 event-journal records.
 
 ## What to watch during a real driveway pass
 
