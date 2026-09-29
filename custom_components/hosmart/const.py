@@ -4,7 +4,7 @@ from homeassistant.const import Platform
 
 DOMAIN = "hosmart"
 DEFAULT_PORT = 8080
-DEFAULT_SCAN_INTERVAL = 1
+DEFAULT_SCAN_INTERVAL = 0.5
 UDP_PORT = 50001
 
 CONF_POP = "pop"
