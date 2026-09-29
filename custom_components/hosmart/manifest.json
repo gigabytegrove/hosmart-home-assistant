@@ -1,7 +1,9 @@
 {
   "domain": "hosmart",
-  "name": "Hosmart",
-  "codeowners": ["@gigabytegrove"],
+  "name": "Ho-Smart",
+  "codeowners": [
+    "@gigabytegrove"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/gigabytegrove/hosmart-home-assistant",
   "integration_type": "device",
