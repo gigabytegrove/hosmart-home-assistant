@@ -74,6 +74,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = HosmartCoordinator(hass, entry, client, recorder)
     await coordinator.async_config_entry_first_refresh()
 
+    # Entries created before v0.2.0 stored the node id only as unique_id.
+    # Backfill it into entry data after a successful local refresh so later
+    # cloud-mode configuration has a stable explicit node identifier.
+    if not entry.data.get(CONF_NODE_ID) and coordinator.node_id:
+        hass.config_entries.async_update_entry(
+            entry,
+            data={
+                **entry.data,
+                CONF_NODE_ID: coordinator.node_id,
+            },
+        )
+
     udp_transport = await async_start_udp_listener(hass, coordinator)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
