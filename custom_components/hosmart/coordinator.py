@@ -78,6 +78,8 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._baseline_event_tuple: tuple[Any, Any, Any] | None = None
         self._previous_event_tuple: tuple[Any, Any, Any] | None = None
         self._previous_receiver: dict[str, Any] | None = None
+        self._previous_params: dict[str, Any] | None = None
+        self._previous_config: dict[str, Any] | None = None
 
     @property
     def receiver(self) -> dict[str, Any]:
@@ -130,8 +132,23 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not isinstance(receiver, dict):
             receiver = {}
 
-        # DEVELOPMENT CAPTURE: write every successful sample, not just changes.
-        # The recorder recursively redacts POP and other credentials.
+        # DEVELOPMENT CAPTURE: write every successful state sample, not just
+        # changes. The large static config is journaled on first sight and only
+        # again if it actually changes; every poll still records the complete
+        # live params object. The recorder recursively redacts POP/credentials.
+        config = snapshot.get("config") or {}
+        if config != self._previous_config:
+            await self.recorder.async_record(
+                "config_snapshot",
+                poll=poll_number,
+                node_id=snapshot.get("node_id"),
+                model=snapshot.get("model"),
+                fw_version=snapshot.get("fw_version"),
+                platform=snapshot.get("platform"),
+                config=config,
+            )
+            self._previous_config = deepcopy(config)
+
         await self.recorder.async_record(
             "poll_snapshot",
             poll=poll_number,
@@ -140,8 +157,20 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             duration_ms=elapsed_ms,
             host=self.client.host,
             port=self.client.port,
-            snapshot=snapshot,
+            node_id=snapshot.get("node_id"),
+            model=snapshot.get("model"),
+            fw_version=snapshot.get("fw_version"),
+            platform=snapshot.get("platform"),
+            params=params,
         )
+
+        if self._previous_params is not None and params != self._previous_params:
+            await self.recorder.async_record(
+                "params_changed",
+                poll=poll_number,
+                previous=self._previous_params,
+                current=params,
+            )
 
         changes = _dict_changes(self._previous_receiver, receiver)
         if changes:
@@ -227,6 +256,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.hass.bus.async_fire(EVENT_ACTIVITY, event_data)
 
         self._previous_receiver = deepcopy(receiver)
+        self._previous_params = deepcopy(params)
         return snapshot
 
 
