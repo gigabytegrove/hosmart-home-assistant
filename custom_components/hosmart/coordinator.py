@@ -37,6 +37,9 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.entry = entry
         self.client = client
         self.last_event_change = None
+        self.last_activity_time = None
+        self.last_activity: dict[str, Any] | None = None
+        self._baseline_event_tuple: tuple[Any, Any, Any] | None = None
         self._previous_event_tuple: tuple[Any, Any, Any] | None = None
 
     @property
@@ -69,10 +72,22 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if self._previous_event_tuple is None:
             self._previous_event_tuple = current
+            self._baseline_event_tuple = current
         elif current != self._previous_event_tuple:
             previous = self._previous_event_tuple
             self._previous_event_tuple = current
-            self.last_event_change = dt_util.utcnow()
+            now = dt_util.utcnow()
+            self.last_event_change = now
+
+            # Preserve the most recent transition away from the startup/idle
+            # tuple so a short alarm can still be inspected after it clears.
+            if current != self._baseline_event_tuple:
+                self.last_activity_time = now
+                self.last_activity = {
+                    "event": current[0],
+                    "channel": current[1],
+                    "channel_name": current[2],
+                }
 
             event_data = {
                 "entry_id": self.entry.entry_id,
@@ -85,6 +100,21 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "previous_event": previous[0],
                 "previous_channel": previous[1],
                 "previous_channel_name": previous[2],
+                "baseline_event": (
+                    self._baseline_event_tuple[0]
+                    if self._baseline_event_tuple is not None
+                    else None
+                ),
+                "baseline_channel": (
+                    self._baseline_event_tuple[1]
+                    if self._baseline_event_tuple is not None
+                    else None
+                ),
+                "baseline_channel_name": (
+                    self._baseline_event_tuple[2]
+                    if self._baseline_event_tuple is not None
+                    else None
+                ),
             }
             _LOGGER.info(
                 "Hosmart activity changed: event=%r channel=%r channel_name=%r",
@@ -134,7 +164,7 @@ async def async_start_udp_listener(
     coordinator: HosmartCoordinator,
 ):
     """Start UDP notification listener if the port is available."""
-    loop = hass.loop
+    loop = asyncio.get_running_loop()
     try:
         transport, _ = await loop.create_datagram_endpoint(
             lambda: HosmartUDPProtocol(coordinator),
