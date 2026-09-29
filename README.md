@@ -1,8 +1,12 @@
-# Hosmart Home Assistant
+<p align="center">
+  <img src="logo.png" alt="Ho-Smart" width="560">
+</p>
 
-Local Home Assistant integration for supported Hosmart/eMACROS driveway alarm receivers using the ESP RainMaker local-control protocol.
+# Ho-Smart for Home Assistant
 
-> **Development status:** early field-test build. The initial target is the HS006W / ESP32-C6 receiver using Security1 local control with the receiver's Proof of Possession (POP). The My Hosmart mobile app and cloud are not required during normal runtime once the receiver is configured.
+Local Home Assistant integration for supported Ho-Smart / Hosmart / eMACROS driveway alarm receivers using the ESP RainMaker local-control protocol.
+
+> **Development status:** early field-test build. The initial target is the HS006W / ESP32-C6 receiver using Security1 local control. During setup, the integration signs in to the user's Ho-Smart account once to retrieve the receiver's local-control key (POP). The Ho-Smart email/password are not saved, and normal runtime communication is local.
 
 ## Current features
 
@@ -37,11 +41,11 @@ This repository is intended to be installed as a HACS custom integration.
 5. Restart Home Assistant.
 6. Go to **Settings → Devices & services → Add integration**.
 7. Search for **Hosmart**.
-8. Enter the receiver IP address, local-control port, and Local Control POP.
+8. Enter the receiver IP address, local-control port, and your **Ho-Smart app account email/password**.
 
-For the verified HS006W test receiver the port is `8080` and Local Control Type is `1`.
+The integration uses those credentials only during onboarding to call Ho-Smart's device API, retrieve the receiver's Local Control metadata, and identify the POP that actually authenticates to the receiver. The account email/password are **not stored** in the Home Assistant config entry. Only the receiver address, port, and local-control POP are retained for local runtime communication.
 
-The POP is a device credential. Do not publish it in issues, screenshots, logs, or GitHub commits.
+For the verified HS006W receiver the local-control port is `8080` and Local Control Type is `1`. Users do not need to know or manually enter the POP.
 
 ## Field-test capture
 
@@ -100,7 +104,8 @@ Useful entities include:
 - `sensor.<device>_last_activity_channel_name`
 - `sensor.<device>_last_activity_time`
 - `sensor.<device>_last_event_change`
-- `sensor.<device>_poll_count`
+- `sensor.<device>_last_poll_time` *(diagnostic; disabled by default because it changes four times per second)*
+- `sensor.<device>_poll_count` *(diagnostic; disabled by default because it changes four times per second)*
 - `sensor.<device>_receiver_change_count`
 - `sensor.<device>_udp_packet_count`
 - `sensor.<device>_last_udp_packet_time`
@@ -148,9 +153,11 @@ Home Assistant
 
 ## Security
 
-The POP is stored in the Home Assistant config entry because it is required to establish Security1 sessions with the receiver. The development debug recorder redacts `POP`, password, and token-shaped fields before writing JSONL diagnostics.
+The receiver's POP (Proof of Possession) is the per-device key used by ESP Security1 to authenticate local-control sessions. It is **not something the user should have to locate or type manually**. During setup, the integration retrieves it from the user's Ho-Smart account, verifies it against the receiver, and stores only that device key for future local access.
 
-Do not post your POP publicly.
+The Ho-Smart account email/password are onboarding-only and are not persisted by this integration. The development debug recorder redacts `POP`, password, and token-shaped fields before writing JSONL diagnostics.
+
+Do not publish a receiver POP if you obtain one separately.
 
 ## License
 
