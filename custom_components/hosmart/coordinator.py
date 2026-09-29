@@ -408,7 +408,10 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 int(start.timestamp() * 1000),
                 int((now + timedelta(seconds=5)).timestamp() * 1000),
             )
-        except HosmartCloudError as err:
+        except Exception as err:
+            # Cloud alarm history is supplemental in Hybrid mode. A malformed
+            # or temporarily unavailable cloud response must never make healthy
+            # local Security1 entities unavailable.
             self.cloud_available = False
             self.cloud_error_count += 1
             self.last_cloud_error = str(err)
@@ -418,8 +421,14 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 error=str(err),
                 initialized=self._cloud_initialized,
             )
+            _LOGGER.warning(
+                "Ho-Smart cloud history update failed; local state remains usable: %s",
+                err,
+            )
             if not self.local_enabled and not self._cloud_initialized:
-                raise UpdateFailed(str(err)) from err
+                if isinstance(err, HosmartCloudError):
+                    raise UpdateFailed(str(err)) from err
+                raise UpdateFailed(f"Cloud alarm history failed: {err}") from err
             return
 
         self.cloud_available = True
@@ -430,7 +439,13 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for record in records
             if str(record.get("node_id") or record.get("nodeId") or "") == str(node_id)
         ]
-        target_records.sort(key=lambda record: int(record.get("msgtime") or 0))
+        def _history_sort_key(record: dict[str, Any]) -> int:
+            try:
+                return int(record.get("msgtime") or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        target_records.sort(key=_history_sort_key)
 
         if not self._cloud_initialized:
             for record in target_records:
@@ -514,12 +529,18 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Refresh whichever transports are enabled for this config entry."""
+        """Refresh enabled transports without coupling their availability."""
         await self._async_local_update()
         await self._async_cloud_update()
 
         if self._local_snapshot is not None:
             return self._local_snapshot
+
+        if self.local_enabled and not self.local_available and not self.cloud_enabled:
+            raise UpdateFailed("Ho-Smart local receiver is unavailable")
+
+        if self.cloud_enabled and not self.cloud_available and not self.local_enabled:
+            raise UpdateFailed("Ho-Smart cloud alarm history is unavailable")
 
         return {
             "node_id": self.node_id,
