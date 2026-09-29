@@ -3,6 +3,9 @@ name: Validate
 on:
   push:
   pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,3 +19,12 @@ jobs:
       - name: Compile Python
         run: python -m compileall -q custom_components/hosmart
       - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
