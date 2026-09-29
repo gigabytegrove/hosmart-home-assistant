@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -90,14 +91,16 @@ SENSORS = (
         name="Last poll time",
         device_class=SensorDeviceClass.TIMESTAMP,
         icon="mdi:update",
-        entity_registry_enabled_default=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         value_fn=lambda c: c.last_poll_time,
     ),
     HosmartSensorDescription(
         key="poll_count",
         name="Poll count",
         icon="mdi:counter",
-        entity_registry_enabled_default=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         value_fn=lambda c: c.poll_count,
     ),
     HosmartSensorDescription(
