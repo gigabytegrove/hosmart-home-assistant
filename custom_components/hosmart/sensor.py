@@ -1,0 +1,108 @@
+"""Sensors for Hosmart receivers."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable
+
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
+from homeassistant.const import PERCENTAGE
+from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from .const import DOMAIN
+from .coordinator import HosmartCoordinator
+from .entity import HosmartEntity
+
+
+@dataclass(frozen=True, kw_only=True)
+class HosmartSensorDescription(SensorEntityDescription):
+    """Describe a Hosmart sensor."""
+
+    value_fn: Callable[[HosmartCoordinator], Any]
+
+
+SENSORS = (
+    HosmartSensorDescription(
+        key="event",
+        name="Event",
+        icon="mdi:motion-sensor",
+        value_fn=lambda c: c.receiver.get("Event"),
+    ),
+    HosmartSensorDescription(
+        key="channel",
+        name="Channel",
+        icon="mdi:numeric",
+        value_fn=lambda c: c.receiver.get("Channel"),
+    ),
+    HosmartSensorDescription(
+        key="channel_name",
+        name="Channel name",
+        icon="mdi:label-outline",
+        value_fn=lambda c: c.receiver.get("ChannelName"),
+    ),
+    HosmartSensorDescription(
+        key="internal_battery",
+        name="Internal battery",
+        device_class=SensorDeviceClass.BATTERY,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda c: c.receiver.get("InternalBattery"),
+    ),
+    HosmartSensorDescription(
+        key="volume",
+        name="Volume",
+        icon="mdi:volume-high",
+        value_fn=lambda c: c.receiver.get("Volume"),
+    ),
+    HosmartSensorDescription(
+        key="child_device_count",
+        name="Child device count",
+        icon="mdi:counter",
+        value_fn=lambda c: c.receiver.get("ChildDeviceCount"),
+    ),
+    HosmartSensorDescription(
+        key="last_event_change",
+        name="Last event change",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:clock-outline",
+        value_fn=lambda c: c.last_event_change,
+    ),
+)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up Hosmart sensors."""
+    coordinator: HosmartCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    async_add_entities(
+        HosmartSensor(coordinator, description) for description in SENSORS
+    )
+
+
+class HosmartSensor(HosmartEntity, SensorEntity):
+    """A Hosmart sensor."""
+
+    entity_description: HosmartSensorDescription
+
+    def __init__(
+        self,
+        coordinator: HosmartCoordinator,
+        description: HosmartSensorDescription,
+    ) -> None:
+        super().__init__(coordinator, description.key)
+        self.entity_description = description
+
+    @property
+    def native_value(self):
+        """Return the current sensor value."""
+        return self.entity_description.value_fn(self.coordinator)
