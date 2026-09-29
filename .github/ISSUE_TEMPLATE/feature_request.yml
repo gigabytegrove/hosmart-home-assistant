@@ -1,16 +1,40 @@
 name: Feature or device support request
-description: Suggest an improvement or device capability
+description: Suggest an improvement or request support for another receiver
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature ideas and device support requests are welcome.
+
+        For new receiver support, please provide the exact model and firmware. Similar-looking Ho-Smart, Hosmart, or eMACROS devices may use different behavior internally.
+
   - type: textarea
     id: problem
-    attributes: {label: Problem or unsupported capability}
-    validations: {required: true}
+    attributes:
+      label: What would you like to improve or add?
+      description: Explain the missing feature, unsupported behavior, or device capability.
+    validations:
+      required: true
+
   - type: textarea
     id: proposal
-    attributes: {label: Proposed behavior}
-    validations: {required: true}
+    attributes:
+      label: What should the integration do?
+      description: Describe the result you would like to see in Home Assistant.
+    validations:
+      required: true
+
   - type: input
     id: device
-    attributes: {label: Device model / firmware if applicable}
+    attributes:
+      label: Receiver model and firmware
+      description: Required for device-support requests.
+      placeholder: "HS006W, firmware 2.0"
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Additional details
+      description: Add screenshots, sanitized diagnostics, logs, or app behavior if they help explain the request.
