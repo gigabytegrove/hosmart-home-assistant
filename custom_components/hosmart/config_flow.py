@@ -28,7 +28,7 @@ class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             host = user_input[CONF_HOST].strip()
-            port = user_input[CONF_PORT]
+            port = int(user_input[CONF_PORT])
             pop = user_input[CONF_POP].strip()
 
             client = HosmartClient(host, port, pop)
@@ -71,6 +71,7 @@ class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     selector.NumberSelectorConfig(
                         min=1,
                         max=65535,
+                        step=1,
                         mode=selector.NumberSelectorMode.BOX,
                     )
                 ),
