@@ -8,9 +8,11 @@ permissions:
   contents: read
 
 jobs:
-  hassfest:
-    name: Hassfest
+  validate:
+    name: Python + Hassfest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Compile Python
+        run: python -m compileall -q custom_components/hosmart
       - uses: home-assistant/actions/hassfest@master
