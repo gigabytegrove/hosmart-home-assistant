@@ -46,32 +46,40 @@ def redact(value: Any, key: str | None = None) -> Any:
 class HosmartDebugRecorder:
     """Append-only rotating JSONL recorder.
 
-    The development integration deliberately records every local state sample,
-    every detected change, every UDP/50001 datagram, and every polling error so
-    a one-off driveway pass can be reconstructed later.
+    The sample log receives every poll. The event journal separately receives
+    every non-poll record so important changes survive even if high-frequency
+    sample files rotate.
     """
 
     def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
         self.hass = hass
         self.directory = Path(hass.config.path("hosmart_debug"))
         self.path = self.directory / f"hosmart_{entry_id}.jsonl"
+        self.event_path = self.directory / f"hosmart_{entry_id}_events.jsonl"
         self._lock = threading.Lock()
 
-    def _rotate_locked(self) -> None:
-        if not self.path.exists() or self.path.stat().st_size < _MAX_BYTES:
+    @staticmethod
+    def _rotate_path(path: Path) -> None:
+        if not path.exists() or path.stat().st_size < _MAX_BYTES:
             return
 
-        oldest = self.path.with_suffix(self.path.suffix + f".{_BACKUPS}")
+        oldest = path.with_suffix(path.suffix + f".{_BACKUPS}")
         if oldest.exists():
             oldest.unlink()
 
         for index in range(_BACKUPS - 1, 0, -1):
-            src = self.path.with_suffix(self.path.suffix + f".{index}")
-            dst = self.path.with_suffix(self.path.suffix + f".{index + 1}")
+            src = path.with_suffix(path.suffix + f".{index}")
+            dst = path.with_suffix(path.suffix + f".{index + 1}")
             if src.exists():
                 src.replace(dst)
 
-        self.path.replace(self.path.with_suffix(self.path.suffix + ".1"))
+        path.replace(path.with_suffix(path.suffix + ".1"))
+
+    @staticmethod
+    def _append(path: Path, encoded: str) -> None:
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(encoded)
+            handle.write("\n")
 
     def record_sync(self, kind: str, **payload: Any) -> None:
         """Synchronously append one structured record."""
@@ -90,10 +98,16 @@ class HosmartDebugRecorder:
 
         with self._lock:
             self.directory.mkdir(parents=True, exist_ok=True)
-            self._rotate_locked()
-            with self.path.open("a", encoding="utf-8") as handle:
-                handle.write(encoded)
-                handle.write("\n")
+
+            self._rotate_path(self.path)
+            self._append(self.path, encoded)
+
+            # Keep a second, compact journal of anything that is not a routine
+            # successful sample. This is the long-lived fallback for scarce
+            # real-world trigger opportunities.
+            if kind != "poll_snapshot":
+                self._rotate_path(self.event_path)
+                self._append(self.event_path, encoded)
 
     async def async_record(self, kind: str, **payload: Any) -> None:
         """Append one record without blocking Home Assistant's event loop."""
@@ -101,14 +115,13 @@ class HosmartDebugRecorder:
             partial(self.record_sync, kind, **payload)
         )
 
-    def tail_sync(self, lines: int = 1000) -> list[dict[str, Any]]:
-        """Return the newest structured records for HA diagnostics."""
-        if not self.path.exists():
+    @staticmethod
+    def _tail_path(path: Path, lines: int) -> list[dict[str, Any]]:
+        if not path.exists():
             return []
 
-        with self._lock:
-            with self.path.open("r", encoding="utf-8", errors="replace") as handle:
-                raw_lines = deque(handle, maxlen=lines)
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            raw_lines = deque(handle, maxlen=lines)
 
         result: list[dict[str, Any]] = []
         for line in raw_lines:
@@ -117,3 +130,13 @@ class HosmartDebugRecorder:
             except json.JSONDecodeError:
                 result.append({"kind": "unparseable_log_line", "raw": line.rstrip()})
         return result
+
+    def tail_sync(self, lines: int = 1000) -> list[dict[str, Any]]:
+        """Return newest full-sample records for HA diagnostics."""
+        with self._lock:
+            return self._tail_path(self.path, lines)
+
+    def event_tail_sync(self, lines: int = 5000) -> list[dict[str, Any]]:
+        """Return newest non-routine records for HA diagnostics."""
+        with self._lock:
+            return self._tail_path(self.event_path, lines)
