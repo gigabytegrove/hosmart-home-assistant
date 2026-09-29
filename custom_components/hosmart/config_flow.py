@@ -57,7 +57,7 @@ def _channel_names(receiver: dict[str, Any]) -> dict[str, str]:
 class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Ho-Smart."""
 
-    VERSION = 2
+    VERSION = 1
 
     @staticmethod
     @callback
