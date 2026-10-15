@@ -4,6 +4,9 @@
 
 # Ho-Smart for Home Assistant
 
+[![Add to HACS](https://img.shields.io/badge/Add%20to-HACS-41BDF5?logo=homeassistant&logoColor=white)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gigabytegrove&repository=hosmart-home-assistant&category=integration)
+[![Open HACS repository on My Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gigabytegrove&repository=hosmart-home-assistant&category=integration)
+
 Bring supported Ho-Smart driveway alarm receivers into Home Assistant with local receiver status, alarm history, and automation-friendly entities.
 
 The integration is currently verified with the **Ho-Smart HS006W** receiver running firmware **2.0**.
@@ -32,14 +35,19 @@ It fixes the startup and availability problems found in earlier v0.2 releases wh
 
 ## Installation with HACS
 
+**One-click installation:** Select the [Add to HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=gigabytegrove&repository=hosmart-home-assistant&category=integration) badge at the top of this README. Choose your Home Assistant instance, then download **Ho-Smart for Home Assistant** in HACS.
+
+**Manual installation (if the badge does not work):**
+
 1. Open **HACS** in Home Assistant.
-2. Add this repository as a custom **Integration** repository:
-   `https://github.com/gigabytegrove/hosmart-home-assistant`
-3. Install **Ho-Smart for Home Assistant**.
-4. Restart Home Assistant.
-5. Go to **Settings → Devices & services → Add integration**.
-6. Search for **Ho-Smart**.
+2. Select the three-dot menu in the upper-right corner, then **Custom repositories**.
+3. Enter `https://github.com/gigabytegrove/hosmart-home-assistant` and select **Integration** as the type.
+4. Select **Add**, open **Ho-Smart for Home Assistant** in HACS, and download the latest release.
+5. Restart Home Assistant.
+6. Go to **Settings → Devices & services → Add integration** and search for **Ho-Smart**.
 7. Follow the setup prompts.
+
+**Note:** This is a custom HACS repository, not currently listed in HACS's default catalog. The badge opens the custom repository in your HACS installation; it does not bypass the download, restart, or initial configuration steps. HACS must already be installed.
 
 ## Setup
 
