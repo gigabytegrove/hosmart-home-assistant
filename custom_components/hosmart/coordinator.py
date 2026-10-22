@@ -40,7 +40,7 @@ from .const import (
     UDP_PORT,
 )
 from .debug import HosmartDebugRecorder
-from .delivery import cloud_query_start, is_driveway_channel, is_live_notice
+from .delivery import cloud_history_window, is_driveway_channel, is_live_notice
 from .cloud_async import HosmartHistoryClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -566,14 +566,8 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Fast three-minute live checks plus a full catch-up reconciliation
         # once a minute reduce vendor requests without dropping late notices.
-        reconcile = (
-            not self._cloud_initialized
-            or self._last_cloud_reconciliation is None
-            or (now - self._last_cloud_reconciliation).total_seconds() >= 60
-        )
-        start = (
-            cloud_query_start(now, self._last_cloud_reconciliation)
-            if reconcile else now - timedelta(minutes=3)
+        start, reconcile = cloud_history_window(
+            now, self._last_cloud_reconciliation, self._cloud_initialized
         )
 
         try:
