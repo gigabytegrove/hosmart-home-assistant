@@ -2,6 +2,10 @@
 
 ## 0.2.5
 
+**Purpose:** Reduce missed Home Assistant driveway-alarm notifications caused by intermittent Ho-Smart cloud DNS/TLS/HTTPS failures, delayed history delivery, and transient local receiver connection errors. This is a reliability and recovery release, **not** a new feature release. It cannot reconstruct physical alarms that the manufacturer never records.
+
+See [detailed v0.2.5 release notes](.github/release-notes/v0.2.5.md) for the original incident, safeguards, limitations, and upgrade/testing instructions.
+
 - Replace repeated one-off HTTPS cloud-history connections with Home Assistant's managed, keep-alive aiohttp session and DNS cache.
 - Retry transient cloud DNS, TCP/TLS, response timeout, invalid JSON, HTTP 429, and HTTP 5xx failures once with a short backoff; fail fast on authentication and certificate verification errors.
 - Split low-latency alarm polling (3-minute window, every 3 seconds) from complete cloud-history reconciliation (hour-overlap catch-up, once a minute). Continue from the persisted reconciliation checkpoint across outages/restarts instead of advancing its cursor on incomplete responses.
