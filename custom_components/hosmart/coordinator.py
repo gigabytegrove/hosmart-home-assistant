@@ -15,13 +15,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .client import HosmartClient, HosmartError
+from .client import HosmartClient, HosmartConnectionError, HosmartError
 from .cloud import (
     HosmartCloudError,
     history_record_key,
     parse_activity,
-    query_history,
 )
 from .const import (
     CLOUD_SCAN_INTERVAL,
@@ -41,6 +41,7 @@ from .const import (
 )
 from .debug import HosmartDebugRecorder
 from .delivery import cloud_query_start, is_driveway_channel, is_live_notice
+from .cloud_async import HosmartHistoryClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -95,6 +96,10 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.entry = entry
         self.client = client
         self.recorder = recorder
+        self._history_client = (
+            HosmartHistoryClient(async_get_clientsession(hass))
+            if self.cloud_enabled else None
+        )
 
         self.local_available = not self.local_enabled
         self.cloud_available = not self.cloud_enabled
@@ -105,6 +110,9 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.cloud_alert_count = 0
         self.cloud_error_count = 0
         self.missed_cloud_alert_count = 0
+        self.cloud_reconcile_count = 0
+        self.cloud_realtime_count = 0
+        self.local_retry_count = 0
 
         self.last_poll_time: datetime | None = None
         self.last_event_change: datetime | None = None
@@ -129,6 +137,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._cloud_initialized = False
         self._cloud_checkpoint_loaded = False
         self._last_cloud_checkpoint_at: datetime | None = None
+        self._last_cloud_reconciliation: datetime | None = None
         self._seen_cloud_keys: set[str] = set()
         self._seen_cloud_order: deque[str] = deque()
         self._alarm_pulse_until = 0.0
@@ -179,6 +188,8 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._alarm_expiry_handle = asyncio.get_running_loop().call_later(
             ALARM_ACTIVE_SECONDS, self._end_alarm_pulse
         )
+        # Publish ON immediately even when a cloud history request has more pages.
+        self.async_set_updated_data(self._local_snapshot or self.data or {})
 
     def cancel_alarm_timer(self) -> None:
         if self._alarm_expiry_handle is not None:
@@ -413,7 +424,14 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         started_at = dt_util.utcnow()
 
         try:
-            snapshot = await self.hass.async_add_executor_job(self.client.read_snapshot)
+            try:
+                snapshot = await self.hass.async_add_executor_job(self.client.read_snapshot)
+            except HosmartConnectionError:
+                # The Security1 client reconnects once already; retry one
+                # additional time for transient Wi-Fi/TCP transport failures.
+                self.local_retry_count += 1
+                await asyncio.sleep(0.3)
+                snapshot = await self.hass.async_add_executor_job(self.client.read_snapshot)
         except Exception as err:
             elapsed_ms = round((time.monotonic() - started) * 1000, 3)
             self.local_available = False
@@ -468,6 +486,12 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.last_cloud_success_time = min(
                 previous.astimezone(timezone.utc), datetime.now(timezone.utc)
             )
+            reconciled = saved.get("last_reconcile") or timestamp
+            parsed_reconcile = datetime.fromisoformat(reconciled)
+            if parsed_reconcile.tzinfo is not None:
+                self._last_cloud_reconciliation = min(
+                    parsed_reconcile.astimezone(timezone.utc), datetime.now(timezone.utc)
+                )
             self._cloud_initialized = True
             keys = saved.get("seen_keys")
             if isinstance(keys, list):
@@ -505,6 +529,10 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         checkpoint = {
             "node_id": self.node_id,
             "last_success": self.last_cloud_success_time.isoformat(),
+            "last_reconcile": (
+                self._last_cloud_reconciliation.isoformat()
+                if self._last_cloud_reconciliation is not None else None
+            ),
             "seen_keys": list(self._seen_cloud_order),
             "last_activity": self.last_activity,
             "last_activity_time": (
@@ -536,12 +564,22 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         now = datetime.now(timezone.utc)
         self.last_cloud_check_time = now
 
-        # Preserve the successful high-watermark across temporary outages.
-        start = cloud_query_start(now, self.last_cloud_success_time)
+        # Fast three-minute live checks plus a full catch-up reconciliation
+        # once a minute reduce vendor requests without dropping late notices.
+        reconcile = (
+            not self._cloud_initialized
+            or self._last_cloud_reconciliation is None
+            or (now - self._last_cloud_reconciliation).total_seconds() >= 60
+        )
+        start = (
+            cloud_query_start(now, self._last_cloud_reconciliation)
+            if reconcile else now - timedelta(minutes=3)
+        )
 
         try:
-            records = await self.hass.async_add_executor_job(
-                query_history,
+            if self._history_client is None:
+                raise HosmartCloudError("Ho-Smart history transport is unavailable")
+            records = await self._history_client.query_history(
                 str(user_id),
                 int(start.timestamp() * 1000),
                 int((now + timedelta(seconds=5)).timestamp() * 1000),
@@ -557,7 +595,9 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "cloud_history_error",
                 error_type=type(err).__name__,
                 error=str(err),
+                category=getattr(err, "category", "other"),
                 initialized=self._cloud_initialized,
+                reconciled=reconcile,
             )
             _LOGGER.warning(
                 "Ho-Smart cloud history update failed; local state remains usable: %s",
@@ -572,6 +612,10 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         was_unavailable = not self.cloud_available
         self.cloud_available = True
         self.last_cloud_error = None
+        if reconcile:
+            self.cloud_reconcile_count += 1
+        else:
+            self.cloud_realtime_count += 1
         if was_unavailable and self._cloud_initialized:
             await self.recorder.async_record(
                 "cloud_history_recovered", query_start=start, query_end=now
@@ -626,6 +670,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             self._cloud_initialized = True
             self.last_cloud_success_time = now
+            self._last_cloud_reconciliation = now
             await self._async_save_cloud_checkpoint(force=True)
             await self.recorder.async_record(
                 "cloud_history_initialized",
@@ -651,11 +696,20 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 continue
 
             msgtime_ms = activity.get("msgtime_ms")
-            activity_time = (
-                datetime.fromtimestamp(msgtime_ms / 1000, timezone.utc)
-                if msgtime_ms is not None
-                else now
-            )
+            if msgtime_ms is None:
+                await self.recorder.async_record(
+                    "cloud_history_invalid_timestamp", record_key=key, record=record
+                )
+                continue
+            try:
+                activity_time = datetime.fromtimestamp(
+                    msgtime_ms / 1000, timezone.utc
+                )
+            except (ValueError, OverflowError, OSError):
+                await self.recorder.async_record(
+                    "cloud_history_invalid_timestamp", record_key=key, record=record
+                )
+                continue
 
             historical = not is_live_notice(activity_time, now)
             self.cloud_alert_count += 1
@@ -687,7 +741,9 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
         self.last_cloud_success_time = now
-        await self._async_save_cloud_checkpoint(force=newly_seen)
+        if reconcile:
+            self._last_cloud_reconciliation = now
+        await self._async_save_cloud_checkpoint(force=newly_seen or reconcile)
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Refresh enabled transports without coupling their availability."""

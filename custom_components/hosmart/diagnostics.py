@@ -57,6 +57,14 @@ async def async_get_config_entry_diagnostics(
             "udp_packet_count": coordinator.udp_packet_count,
             "cloud_alert_count": coordinator.cloud_alert_count,
             "cloud_error_count": coordinator.cloud_error_count,
+            "cloud_transport": (
+                coordinator._history_client.stats
+                if coordinator._history_client is not None else None
+            ),
+            "cloud_reconcile_count": coordinator.cloud_reconcile_count,
+            "cloud_realtime_count": coordinator.cloud_realtime_count,
+            "last_cloud_reconciliation": coordinator._last_cloud_reconciliation,
+            "local_retry_count": coordinator.local_retry_count,
             "missed_cloud_alert_count": coordinator.missed_cloud_alert_count,
             "cloud_reporting_healthy": coordinator.cloud_reporting_healthy,
             "last_cloud_success_time": coordinator.last_cloud_success_time,
