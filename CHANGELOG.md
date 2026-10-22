@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.5
+
+- Replace repeated one-off HTTPS cloud-history connections with Home Assistant's managed, keep-alive aiohttp session and DNS cache.
+- Retry transient cloud DNS, TCP/TLS, response timeout, invalid JSON, HTTP 429, and HTTP 5xx failures once with a short backoff; fail fast on authentication and certificate verification errors.
+- Split low-latency alarm polling (3-minute window, every 3 seconds) from complete cloud-history reconciliation (hour-overlap catch-up, once a minute). Continue from the persisted reconciliation checkpoint across outages/restarts instead of advancing its cursor on incomplete responses.
+- Retain all-or-nothing pagination validation, limit oversized responses, and expose categorized transport errors, retries, request latency, and reconciliation statistics in diagnostics.
+- Retry intermittent local receiver connection failures once without hiding authentication errors.
+- Immediately publish the driveway motion ON transition while cloud pagination is still processing. Suppress spurious live alarms from cloud records with malformed timestamps.
+- No DNS, firewall, receiver configuration, accounts, or credentials are changed.
+
+
 ## 0.2.4
 
 - Add restart-safe alarm recovery with an atomic, per-device cursor and cloud notice deduplication checkpoint.

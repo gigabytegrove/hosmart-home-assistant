@@ -290,3 +290,19 @@ interruption recovery) and deduplicates already processed notices. Older recover
 alerts are recorded without firing new motion automations. The receiver's physical
 alarm can still sound independently of Ho-Smart's cloud notice service; vendor
 non-delivery cannot be corrected locally.
+
+
+### Resilient network handling (v0.2.5)
+
+Ho-Smart reuses Home Assistant's shared HTTPS connection pool and cached DNS.
+Transient cloud DNS/connection/TLS handshake errors, read timeouts, HTTP 429,
+and server-side errors are retried once. Authentication and TLS certificate
+verification failures are not bypassed. Cloud history is checked frequently
+for live alarms and reconciled once per minute for late notifications.
+Successful reconciliation progress is stored across restarts; partial history
+does not advance the recovery checkpoint. Diagnostics now include
+`cloud_transport` categorized failures and retries, `cloud_reconcile_count`,
+`cloud_realtime_count`, `last_cloud_reconciliation`, and `local_retry_count`.
+
+These changes minimize recoverable misses but cannot guarantee notice delivery
+when the manufacturer never uploads a physical alarm to its cloud service.
