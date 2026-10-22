@@ -27,11 +27,9 @@ Ho-Smart for Home Assistant can provide:
 
 For the HS006W, the receiver exposes normal status locally but does not expose driveway alarm events through its local status data. Because of that, **Hybrid mode** combines local receiver data with Ho-Smart alarm history and is the recommended setup.
 
-## Current stable version
+## Current release
 
-**v0.2.2** is the current known-good baseline for the verified HS006W setup.
-
-It fixes the startup and availability problems found in earlier v0.2 releases while keeping local and cloud operation independent in Hybrid mode.
+For the current tested version, installation instructions, and update-specific limitations, consult the [GitHub Releases page](https://github.com/gigabytegrove/hosmart-home-assistant/releases). v0.2.5 specifically addresses intermittent cloud communication failures and alarm-history recovery; it does not guarantee delivery of alarms absent from Ho-Smart's cloud history.
 
 ## Installation with HACS
 
