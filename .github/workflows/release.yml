@@ -42,7 +42,10 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Publish documented GitHub release
+      - name: Require detailed release notes
+        run: python scripts/validate_release_notes.py
+
+      - name: Publish documented GitHub release and repair existing notes
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -54,36 +57,42 @@ jobs:
 
           NOTES_FILE=".github/release-notes/v${VERSION}.md"
 
-          # If an earlier workflow already published this version with
-          # generated notes, replace its body with the curated release notes.
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            if [[ -f "$NOTES_FILE" ]]; then
-              gh release edit "$TAG" \
-                --title "Ho-Smart for Home Assistant $TAG" \
-                --notes-file "$NOTES_FILE"
-              echo "Updated documented release $TAG."
-            else
-              echo "Release $TAG already exists; no curated notes for this version."
-            fi
-            exit 0
-          fi
+          # Never publish changelog-only/generated release notes.
+          test -s "$NOTES_FILE" || {
+            echo "Missing curated release notes for $TAG" >&2
+            exit 1
+          }
 
-          # Do not publish superseded code when a newer main commit
-          # has not yet passed its own validation.
+          # Do not publish a superseded commit or replace existing notes
+          # from an older revision that has not been validated against main.
           git fetch origin main
           if [[ "$(git rev-parse origin/main)" != "$VALIDATED_SHA" ]]; then
             echo "Skipping release from outdated validated commit."
             exit 0
           fi
 
-          if [[ -f "$NOTES_FILE" ]]; then
-            gh release create "$TAG" \
-              --target "$VALIDATED_SHA" \
-              --title "Ho-Smart for Home Assistant $TAG" \
-              --notes-file "$NOTES_FILE"
-          else
-            gh release create "$TAG" \
-              --target "$VALIDATED_SHA" \
-              --title "Ho-Smart for Home Assistant $TAG" \
-              --generate-notes
+          # Backfill older published releases whose initial bodies were just
+          # an auto-generated changelog. Never create a historical release.
+          for notes in .github/release-notes/v*.md; do
+            note_tag="$(basename "$notes" .md)"
+            if gh release view "$note_tag" >/dev/null 2>&1; then
+              published_body="$(gh release view "$note_tag" --json body --jq .body)"
+              intended_body="$(cat "$notes")"
+              if [[ "$published_body" != "$intended_body" ]]; then
+                gh release edit "$note_tag" \
+                  --title "Ho-Smart for Home Assistant $note_tag" \
+                  --notes-file "$notes"
+                echo "Updated descriptive release notes for $note_tag."
+              fi
+            fi
+          done
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Documented release $TAG already exists."
+            exit 0
           fi
+
+          gh release create "$TAG" \
+            --target "$VALIDATED_SHA" \
+            --title "Ho-Smart for Home Assistant $TAG" \
+            --notes-file "$NOTES_FILE"

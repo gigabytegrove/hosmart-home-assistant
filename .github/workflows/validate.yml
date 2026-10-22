@@ -18,6 +18,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Compile Python
         run: python -m compileall -q custom_components/hosmart
+      - name: Verify substantive GitHub Release notes
+        run: python scripts/validate_release_notes.py
       - uses: home-assistant/actions/hassfest@master
 
   hacs:
