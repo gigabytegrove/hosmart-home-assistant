@@ -113,6 +113,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         transport.close()
 
     coordinator: HosmartCoordinator = runtime["coordinator"]
+    coordinator.cancel_alarm_timer()
     recorder: HosmartDebugRecorder = runtime["recorder"]
     await recorder.async_record(
         "integration_stop",
