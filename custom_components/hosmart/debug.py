@@ -52,6 +52,9 @@ class HosmartDebugRecorder:
         self.directory = Path(hass.config.path("hosmart_debug"))
         self.path = self.directory / f"hosmart_{entry_id}.jsonl"
         self.event_path = self.directory / f"hosmart_{entry_id}_events.jsonl"
+        self.cloud_checkpoint_path = (
+            self.directory / f"hosmart_{entry_id}_cloud_checkpoint.json"
+        )
         self._lock = threading.Lock()
 
     @staticmethod
@@ -101,6 +104,27 @@ class HosmartDebugRecorder:
             if kind != "poll_snapshot":
                 self._rotate_path(self.event_path)
                 self._append(self.event_path, encoded)
+
+    def load_cloud_checkpoint_sync(self) -> dict[str, Any]:
+        """Read a small entry-scoped cursor without blocking the event loop."""
+        with self._lock:
+            try:
+                if self.cloud_checkpoint_path.stat().st_size > 512 * 1024:
+                    return {}
+                with self.cloud_checkpoint_path.open("r", encoding="utf-8") as handle:
+                    value = json.load(handle)
+            except (OSError, ValueError, json.JSONDecodeError):
+                return {}
+            return value if isinstance(value, dict) else {}
+
+    def save_cloud_checkpoint_sync(self, checkpoint: dict[str, Any]) -> None:
+        """Write atomically so crashes cannot damage the previous checkpoint."""
+        encoded = json.dumps(checkpoint, ensure_ascii=False, separators=(",", ":"))
+        with self._lock:
+            self.directory.mkdir(parents=True, exist_ok=True)
+            temporary = self.cloud_checkpoint_path.with_suffix(".json.tmp")
+            temporary.write_text(encoded, encoding="utf-8")
+            temporary.replace(self.cloud_checkpoint_path)
 
     async def async_record(self, kind: str, **payload: Any) -> None:
         """Append one record without blocking Home Assistant's event loop."""

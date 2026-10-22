@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 MAX_LIVE_NOTICE_AGE_SECONDS = 120
-CLOUD_RECOVERY_OVERLAP = timedelta(minutes=3)
+CLOUD_RECOVERY_OVERLAP = timedelta(hours=1)
 CLOUD_RECOVERY_MAX_LOOKBACK = timedelta(days=7)
 CLOUD_INITIAL_LOOKBACK = timedelta(days=30)
 CLOCK_SKEW_ALLOWANCE_SECONDS = 5
@@ -15,7 +15,7 @@ def cloud_query_start(now: datetime, last_success: datetime | None) -> datetime:
     """Resume from last successful check, with a bounded overlap."""
     if last_success is None:
         return now - CLOUD_INITIAL_LOOKBACK
-    return max(last_success - CLOUD_RECOVERY_OVERLAP, now - CLOUD_RECOVERY_MAX_LOOKBACK)
+    return max(min(last_success, now) - CLOUD_RECOVERY_OVERLAP, now - CLOUD_RECOVERY_MAX_LOOKBACK)
 
 
 def is_live_notice(activity_time: datetime, observed_at: datetime) -> bool:

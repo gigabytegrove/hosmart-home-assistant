@@ -279,3 +279,14 @@ MIT
 The **Cloud alarm reporting available** diagnostic sensor reports recent successful cloud history access; it does not guarantee the receiver uploaded an event. Cloud interruptions now recover from the last successful query (up to seven days) rather than a moving three-minute window. Notices delayed more than two minutes are logged as historical, not announced as new motion. See diagnostic fields `last_cloud_success_time`, `missed_cloud_alert_count`, and `last_alarm_received_at`.
 
 **Hardware limitation:** HS006W local status polling has not exposed actual driveway triggers, and testing has not established a working UDP alarm source. If its cloud never receives an alarm, this integration cannot infer it from static local status. Use an independently connected local motion sensor for safety-critical automations until a validated local event source is available.
+
+
+### Alarm recovery after restarts (v0.2.4)
+
+In Hybrid/Cloud mode, successful Ho-Smart history checks persist a recovery cursor
+to `/config/hosmart_debug/`. After an outage or Home Assistant restart, Ho-Smart
+reconciles the notice history with an hour of overlap (up to seven days of
+interruption recovery) and deduplicates already processed notices. Older recovered
+alerts are recorded without firing new motion automations. The receiver's physical
+alarm can still sound independently of Ho-Smart's cloud notice service; vendor
+non-delivery cannot be corrected locally.

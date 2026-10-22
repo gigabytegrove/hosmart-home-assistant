@@ -225,6 +225,7 @@ def query_history(
     """Query Ho-Smart notice history using the app's exact request format."""
     records: list[dict[str, Any]] = []
     last_key: Any = ""
+    seen_cursors: set[str] = set()
 
     for _ in range(max_pages):
         response = _request_json(
@@ -246,10 +247,15 @@ def query_history(
 
         next_key = response.get("lastKey")
         if not next_key:
-            break
+            return records
+        cursor = json.dumps(next_key, sort_keys=True, default=str)
+        if cursor in seen_cursors:
+            raise HosmartCloudError("Ho-Smart history returned a repeated page cursor")
+        seen_cursors.add(cursor)
         last_key = next_key
 
-    return records
+    # Do not silently advance the checkpoint if history is incomplete.
+    raise HosmartCloudError("Ho-Smart history exceeded the pagination limit")
 
 
 def history_record_key(record: dict[str, Any]) -> str:

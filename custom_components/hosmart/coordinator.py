@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
@@ -126,7 +127,10 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._next_local_poll = 0.0
 
         self._cloud_initialized = False
+        self._cloud_checkpoint_loaded = False
+        self._last_cloud_checkpoint_at: datetime | None = None
         self._seen_cloud_keys: set[str] = set()
+        self._seen_cloud_order: deque[str] = deque()
         self._alarm_pulse_until = 0.0
         self._alarm_expiry_handle: asyncio.TimerHandle | None = None
         self.last_alarm_received_at: datetime | None = None
@@ -435,8 +439,91 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             elapsed_ms=elapsed_ms,
         )
 
+    def _remember_cloud_key(self, key: str) -> None:
+        """Bound the deduplication cache and retain chronological order."""
+        if key in self._seen_cloud_keys:
+            return
+        if len(self._seen_cloud_order) >= 4096:
+            self._seen_cloud_keys.discard(self._seen_cloud_order.popleft())
+        self._seen_cloud_keys.add(key)
+        self._seen_cloud_order.append(key)
+
+    async def _async_load_cloud_checkpoint(self) -> None:
+        """Restore the cursor and delivered records across HA restarts."""
+        if self._cloud_checkpoint_loaded:
+            return
+        self._cloud_checkpoint_loaded = True
+        try:
+            saved = await self.hass.async_add_executor_job(
+                self.recorder.load_cloud_checkpoint_sync
+            )
+            if not isinstance(saved, dict) or saved.get("node_id") != self.node_id:
+                return
+            timestamp = saved.get("last_success")
+            if not isinstance(timestamp, str):
+                return
+            previous = datetime.fromisoformat(timestamp)
+            if previous.tzinfo is None:
+                return
+            self.last_cloud_success_time = min(
+                previous.astimezone(timezone.utc), datetime.now(timezone.utc)
+            )
+            self._cloud_initialized = True
+            keys = saved.get("seen_keys")
+            if isinstance(keys, list):
+                for key in keys[-4096:]:
+                    if isinstance(key, str) and key:
+                        self._remember_cloud_key(key)
+            # Keep the previous 'Last activity' entities populated after a
+            # restart without replaying the historical alarm as live motion.
+            recent = saved.get("last_activity")
+            recent_time = saved.get("last_activity_time")
+            if isinstance(recent, dict) and isinstance(recent_time, str):
+                parsed_time = datetime.fromisoformat(recent_time)
+                if parsed_time.tzinfo is not None:
+                    self.last_activity = recent
+                    self.last_activity_time = parsed_time.astimezone(timezone.utc)
+                    self.last_event_change = self.last_activity_time
+                    saved_source = saved.get("last_activity_source")
+                    self.last_activity_source = (
+                        saved_source if isinstance(saved_source, str) else None
+                    )
+        except (OSError, ValueError, TypeError) as err:
+            _LOGGER.warning("Ho-Smart cloud checkpoint recovery failed: %s", err)
+
+    async def _async_save_cloud_checkpoint(self, *, force: bool = False) -> None:
+        """Save successful cloud reads periodically and after every new notice."""
+        if self.last_cloud_success_time is None:
+            return
+        now = datetime.now(timezone.utc)
+        if (
+            not force
+            and self._last_cloud_checkpoint_at is not None
+            and (now - self._last_cloud_checkpoint_at).total_seconds() < 30
+        ):
+            return
+        checkpoint = {
+            "node_id": self.node_id,
+            "last_success": self.last_cloud_success_time.isoformat(),
+            "seen_keys": list(self._seen_cloud_order),
+            "last_activity": self.last_activity,
+            "last_activity_time": (
+                self.last_activity_time.isoformat()
+                if self.last_activity_time is not None else None
+            ),
+            "last_activity_source": self.last_activity_source,
+        }
+        try:
+            await self.hass.async_add_executor_job(
+                self.recorder.save_cloud_checkpoint_sync, checkpoint
+            )
+        except OSError as err:
+            _LOGGER.warning("Ho-Smart cloud checkpoint could not be saved: %s", err)
+            return
+        self._last_cloud_checkpoint_at = now
+
     async def _async_cloud_update(self) -> None:
-        """Load historical baseline once, then watch recent Ho-Smart alarms."""
+        """Reconcile notices after cloud outages, lag, and HA restarts."""
         if not self.cloud_enabled:
             return
 
@@ -445,6 +532,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not user_id or not node_id:
             return
 
+        await self._async_load_cloud_checkpoint()
         now = datetime.now(timezone.utc)
         self.last_cloud_check_time = now
 
@@ -484,7 +572,6 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         was_unavailable = not self.cloud_available
         self.cloud_available = True
         self.last_cloud_error = None
-        self.last_cloud_success_time = now
         if was_unavailable and self._cloud_initialized:
             await self.recorder.async_record(
                 "cloud_history_recovered", query_start=start, query_end=now
@@ -505,7 +592,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if not self._cloud_initialized:
             for record in target_records:
-                self._seen_cloud_keys.add(history_record_key(record))
+                self._remember_cloud_key(history_record_key(record))
 
             latest_activity = None
             latest_record = None
@@ -538,6 +625,8 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 )
 
             self._cloud_initialized = True
+            self.last_cloud_success_time = now
+            await self._async_save_cloud_checkpoint(force=True)
             await self.recorder.async_record(
                 "cloud_history_initialized",
                 records=len(target_records),
@@ -545,11 +634,13 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             return
 
+        newly_seen = False
         for record in target_records:
             key = history_record_key(record)
             if key in self._seen_cloud_keys:
                 continue
-            self._seen_cloud_keys.add(key)
+            newly_seen = True
+            self._remember_cloud_key(key)
 
             activity = parse_activity(record)
             if activity is None:
@@ -594,6 +685,9 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 historical=historical,
                 record_key=key,
             )
+
+        self.last_cloud_success_time = now
+        await self._async_save_cloud_checkpoint(force=newly_seen)
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Refresh enabled transports without coupling their availability."""

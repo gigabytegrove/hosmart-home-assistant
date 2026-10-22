@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.4
+
+- Add restart-safe alarm recovery with an atomic, per-device cursor and cloud notice deduplication checkpoint.
+- Expand cloud-history overlap to one hour so delayed vendor uploads are not silently missed after otherwise successful polls.
+- Reject cloud pagination loops and truncated history, preserving the checkpoint for the next successful reconciliation.
+- Preserve the v0.2.3 channel-one motion pulse and prevent stale recovered notices from triggering automations.
+- No new credentials, onboarding, or settings required.
+
+
 ## 0.2.3
 
 - Recovers cloud history using the last successful query time rather than permanently skipping events after a three-minute outage.
