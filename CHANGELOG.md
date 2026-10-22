@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.3
+
+- Recovers cloud history using the last successful query time rather than permanently skipping events after a three-minute outage.
+- Uses a full 10-second receipt-time motion pulse with an independent expiration callback, fixing late cloud delivery hiding fresh activity.
+- Marks recovered notices older than two minutes as historical to avoid false live-motion alerts and records their count in diagnostics.
+- Prevents older recovered events from overwriting newer activity and restricts driveway motion to channel one.
+- Adds a cloud reporting connectivity diagnostic sensor, last successful cloud poll, and last received live alarm time.
+- Does not require account or receiver reconfiguration. Manufacturer cloud events absent from all receiver interfaces cannot be reconstructed.
+
+
 ## 0.2.2
 
 - Fixed startup failure in v0.2.1 caused by a missing `CONF_NODE_ID` import in `__init__.py`.

@@ -115,7 +115,7 @@ Several troubleshooting and diagnostic entities are also available but are disab
 
 ## Using alarms in automations
 
-The **Driveway alarm** binary sensor becomes active briefly when a newly observed alarm is detected.
+The **Driveway alarm** binary sensor becomes active for 10 seconds upon receipt of a recent channel-one alarm, with an independent timer to turn it off even if cloud polling subsequently fails.
 
 The integration also fires Home Assistant events:
 
@@ -272,3 +272,10 @@ The integration is built around behavior verified on real hardware rather than a
 ## License
 
 MIT
+
+
+### Alarm-delivery reliability (v0.2.3)
+
+The **Cloud alarm reporting available** diagnostic sensor reports recent successful cloud history access; it does not guarantee the receiver uploaded an event. Cloud interruptions now recover from the last successful query (up to seven days) rather than a moving three-minute window. Notices delayed more than two minutes are logged as historical, not announced as new motion. See diagnostic fields `last_cloud_success_time`, `missed_cloud_alert_count`, and `last_alarm_received_at`.
+
+**Hardware limitation:** HS006W local status polling has not exposed actual driveway triggers, and testing has not established a working UDP alarm source. If its cloud never receives an alarm, this integration cannot infer it from static local status. Use an independently connected local motion sensor for safety-critical automations until a validated local event source is available.

@@ -24,6 +24,7 @@ from .cloud import (
 )
 from .const import (
     CLOUD_SCAN_INTERVAL,
+    ALARM_ACTIVE_SECONDS,
     CONF_CHANNEL_NAMES,
     CONF_MODE,
     CONF_NODE_ID,
@@ -38,6 +39,7 @@ from .const import (
     UDP_PORT,
 )
 from .debug import HosmartDebugRecorder
+from .delivery import cloud_query_start, is_driveway_channel, is_live_notice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,6 +103,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.udp_packet_count = 0
         self.cloud_alert_count = 0
         self.cloud_error_count = 0
+        self.missed_cloud_alert_count = 0
 
         self.last_poll_time: datetime | None = None
         self.last_event_change: datetime | None = None
@@ -110,6 +113,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.last_udp_time: datetime | None = None
         self.last_udp_source: str | None = None
         self.last_cloud_check_time: datetime | None = None
+        self.last_cloud_success_time: datetime | None = None
         self.last_cloud_error: str | None = None
 
         self._baseline_event_tuple: tuple[Any, Any, Any] | None = None
@@ -123,6 +127,9 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self._cloud_initialized = False
         self._seen_cloud_keys: set[str] = set()
+        self._alarm_pulse_until = 0.0
+        self._alarm_expiry_handle: asyncio.TimerHandle | None = None
+        self.last_alarm_received_at: datetime | None = None
 
     @property
     def receiver(self) -> dict[str, Any]:
@@ -139,6 +146,41 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return str(self._local_snapshot["node_id"])
         node_id = self.entry.data.get(CONF_NODE_ID) or self.entry.unique_id
         return str(node_id) if node_id else None
+
+    @property
+    def alarm_pulse_active(self) -> bool:
+        """Keep alarm ON by reception time rather than a delayed cloud timestamp."""
+        return time.monotonic() < self._alarm_pulse_until
+
+    @property
+    def cloud_reporting_healthy(self) -> bool:
+        """Report successful recent history access, not guaranteed alarm delivery."""
+        return bool(
+            self.cloud_enabled
+            and self.cloud_available
+            and self.last_cloud_success_time is not None
+            and (dt_util.utcnow() - self.last_cloud_success_time).total_seconds() < 90
+        )
+
+    def _end_alarm_pulse(self) -> None:
+        self._alarm_expiry_handle = None
+        self._alarm_pulse_until = 0.0
+        self.async_set_updated_data(self._local_snapshot or self.data or {})
+
+    def _start_alarm_pulse(self) -> None:
+        if self._alarm_expiry_handle is not None:
+            self._alarm_expiry_handle.cancel()
+        self.last_alarm_received_at = dt_util.utcnow()
+        self._alarm_pulse_until = time.monotonic() + ALARM_ACTIVE_SECONDS
+        self._alarm_expiry_handle = asyncio.get_running_loop().call_later(
+            ALARM_ACTIVE_SECONDS, self._end_alarm_pulse
+        )
+
+    def cancel_alarm_timer(self) -> None:
+        if self._alarm_expiry_handle is not None:
+            self._alarm_expiry_handle.cancel()
+            self._alarm_expiry_handle = None
+        self._alarm_pulse_until = 0.0
 
     def request_local_refresh(self) -> None:
         """Force the next coordinator cycle to include a local read."""
@@ -186,16 +228,18 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if mapped is not None:
                 channel = mapped
 
-        self.last_activity_time = activity_time
-        self.last_event_change = activity_time
-        self.last_activity_source = source
-        self.last_activity = {
-            "event": event,
-            "channel": channel,
-            "channel_name": channel_name,
-            "source": source,
-            "message": message,
-        }
+        # Recovered older notices must not overwrite newer last-activity data.
+        if self.last_activity_time is None or activity_time >= self.last_activity_time:
+            self.last_activity_time = activity_time
+            self.last_event_change = activity_time
+            self.last_activity_source = source
+            self.last_activity = {
+                "event": event,
+                "channel": channel,
+                "channel_name": channel_name,
+                "source": source,
+                "message": message,
+            }
 
         activity_data = {
             "entry_id": self.entry.entry_id,
@@ -222,6 +266,14 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.hass.bus.async_fire(EVENT_ACTIVITY, activity_data)
 
         if str(event or "").casefold() == "alarm":
+            configured = self.entry.data.get(CONF_CHANNEL_NAMES) or {}
+            driveway_name = (
+                self.receiver.get("Channel1Name")
+                or (configured.get("1") if isinstance(configured, dict) else None)
+                or "Driveway"
+            )
+            if is_driveway_channel(channel, channel_name, driveway_name):
+                self._start_alarm_pulse()
             self.hass.bus.async_fire(EVENT_ALERT, activity_data)
 
     async def _async_process_local_snapshot(
@@ -396,10 +448,8 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         now = datetime.now(timezone.utc)
         self.last_cloud_check_time = now
 
-        if not self._cloud_initialized:
-            start = now - timedelta(days=30)
-        else:
-            start = now - timedelta(minutes=3)
+        # Preserve the successful high-watermark across temporary outages.
+        start = cloud_query_start(now, self.last_cloud_success_time)
 
         try:
             records = await self.hass.async_add_executor_job(
@@ -431,8 +481,14 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 raise UpdateFailed(f"Cloud alarm history failed: {err}") from err
             return
 
+        was_unavailable = not self.cloud_available
         self.cloud_available = True
         self.last_cloud_error = None
+        self.last_cloud_success_time = now
+        if was_unavailable and self._cloud_initialized:
+            await self.recorder.async_record(
+                "cloud_history_recovered", query_start=start, query_end=now
+            )
 
         target_records = [
             record
@@ -510,13 +566,24 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 else now
             )
 
+            historical = not is_live_notice(activity_time, now)
             self.cloud_alert_count += 1
             await self.recorder.async_record(
                 "cloud_history_alert",
                 alert_number=self.cloud_alert_count,
                 record=record,
                 parsed=activity,
+                historical=historical,
             )
+            if historical:
+                self.missed_cloud_alert_count += 1
+                await self.recorder.async_record(
+                    "late_cloud_alert",
+                    alert_number=self.cloud_alert_count,
+                    activity_time=activity_time,
+                    observed_at=now,
+                    record_key=key,
+                )
             await self._async_set_activity(
                 event=activity.get("event"),
                 channel=activity.get("channel"),
@@ -524,7 +591,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 activity_time=activity_time,
                 source="cloud",
                 message=activity.get("message"),
-                historical=False,
+                historical=historical,
                 record_key=key,
             )
 
