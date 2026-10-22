@@ -4,6 +4,12 @@
 
 # Ho-Smart for Home Assistant
 
+[![GitHub stars](https://img.shields.io/github/stars/gigabytegrove/hosmart-home-assistant?style=flat&label=Stars)](https://github.com/gigabytegrove/hosmart-home-assistant/stargazers)
+[![GitHub repository](https://img.shields.io/badge/GitHub-Repository-181717?logo=github&logoColor=white)](https://github.com/gigabytegrove/hosmart-home-assistant)
+[![Open issues](https://img.shields.io/github/issues/gigabytegrove/hosmart-home-assistant)](https://github.com/gigabytegrove/hosmart-home-assistant/issues)
+[![Latest GitHub release](https://img.shields.io/github/v/release/gigabytegrove/hosmart-home-assistant?label=Release)](https://github.com/gigabytegrove/hosmart-home-assistant/releases)
+[![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-0070BA?logo=paypal&logoColor=white)](https://paypal.me/gigabytegrove)
+
 [![Add to HACS](https://img.shields.io/badge/Add%20to-HACS-41BDF5?logo=homeassistant&logoColor=white)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gigabytegrove&repository=hosmart-home-assistant&category=integration)
 [![Open HACS repository on My Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gigabytegrove&repository=hosmart-home-assistant&category=integration)
 
@@ -304,3 +310,7 @@ does not advance the recovery checkpoint. Diagnostics now include
 
 These changes minimize recoverable misses but cannot guarantee notice delivery
 when the manufacturer never uploads a physical alarm to its cloud service.
+
+## Support Gigabyte Grove
+
+If this project is useful to you, you can support ongoing Gigabyte Grove development with an optional [PayPal donation](https://paypal.me/gigabytegrove). Donations are appreciated but never required to use this integration.
