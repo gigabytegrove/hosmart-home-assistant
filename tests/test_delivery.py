@@ -38,6 +38,32 @@ class TestDelivery(unittest.TestCase):
     def test_seven_day_recovery_limit(self):
         self.assertEqual(delivery.cloud_query_start(self.now, self.now - timedelta(days=10)), self.now - timedelta(days=7))
 
+    def test_cloud_window_live_poll_avoids_hourly_rescan(self):
+        start, full = delivery.cloud_history_window(
+            self.now, self.now - timedelta(seconds=30), True
+        )
+        self.assertFalse(full)
+        self.assertEqual(start, self.now - timedelta(minutes=3))
+
+    def test_cloud_window_reconciliation_every_minute(self):
+        start, full = delivery.cloud_history_window(
+            self.now, self.now - timedelta(seconds=60), True
+        )
+        self.assertTrue(full)
+        self.assertEqual(start, self.now - timedelta(hours=1, seconds=60))
+
+    def test_cloud_window_first_setup(self):
+        start, full = delivery.cloud_history_window(self.now, None, False)
+        self.assertTrue(full)
+        self.assertEqual(start, self.now - timedelta(days=30))
+
+    def test_cloud_window_failed_reconciliation_is_not_advanced(self):
+        # If the full scan fails, the prior full-scan time is retained.
+        previous = self.now - timedelta(hours=2)
+        start, full = delivery.cloud_history_window(self.now, previous, True)
+        self.assertTrue(full)
+        self.assertEqual(start, previous - timedelta(hours=1))
+
     def test_live_notice_age(self):
         self.assertTrue(delivery.is_live_notice(self.now - timedelta(seconds=120), self.now))
         self.assertFalse(delivery.is_live_notice(self.now - timedelta(seconds=121), self.now))

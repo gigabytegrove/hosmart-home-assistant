@@ -35,3 +35,21 @@ def is_driveway_channel(channel: object, channel_name: object, driveway_name: ob
         channel_name and driveway_name
         and str(channel_name).strip().casefold() == str(driveway_name).strip().casefold()
     )
+
+
+def cloud_history_window(
+    now: datetime, last_reconcile: datetime | None, initialized: bool
+) -> tuple[datetime, bool]:
+    """Return bounded query start and whether full recovery is required.
+
+    Live polls use a narrow window; full reconciliation runs at least once
+    a minute and resumes from the previous successful FULL reconciliation.
+    """
+    reconcile = (
+        not initialized
+        or last_reconcile is None
+        or (now - last_reconcile).total_seconds() >= 60
+    )
+    if reconcile:
+        return cloud_query_start(now, last_reconcile), True
+    return now - timedelta(minutes=3), False
