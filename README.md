@@ -35,7 +35,9 @@ For the HS006W, the receiver exposes normal status locally but does not expose d
 
 ## Current release
 
-For the current tested version, installation instructions, and update-specific limitations, consult the [GitHub Releases page](https://github.com/gigabytegrove/hosmart-home-assistant/releases). v0.2.5 specifically addresses intermittent cloud communication failures and alarm-history recovery; it does not guarantee delivery of alarms absent from Ho-Smart's cloud history.
+**Current integration version: v0.2.5**
+
+See the [latest published GitHub Release](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest) for installation and upgrade information and the [v0.2.5 release notes](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.5) for this version's changes and limitations. v0.2.5 addresses intermittent cloud communication failures and alarm-history recovery; it cannot report driveway alarms that never reach Ho-Smart's cloud history.
 
 ## Installation with HACS
 
@@ -271,12 +273,9 @@ These logs are rotated automatically.
 
 The integration is built around behavior verified on real hardware rather than assumed compatibility.
 
-**v0.2.2 is the current stable baseline.** Future changes should preserve the working local and Hybrid behavior unless testing proves a change is necessary.
+The current integration version is listed in [Current release](#current-release), and the authoritative published version is available on [GitHub Releases](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest). Verified device support remains limited to the **HS006W with firmware 2.0**. Future releases must preserve known-good local and Hybrid behavior unless testing supports a change.
 
-## License
-
-MIT
-
+## Reliability changes by version
 
 ### Alarm-delivery reliability (v0.2.3)
 
@@ -310,6 +309,10 @@ does not advance the recovery checkpoint. Diagnostics now include
 
 These changes minimize recoverable misses but cannot guarantee notice delivery
 when the manufacturer never uploads a physical alarm to its cloud service.
+
+## License
+
+MIT
 
 ## Support Gigabyte Grove
 

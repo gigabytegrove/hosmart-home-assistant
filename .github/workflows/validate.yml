@@ -20,6 +20,10 @@ jobs:
         run: python -m compileall -q custom_components/hosmart
       - name: Verify substantive GitHub Release notes
         run: python scripts/validate_release_notes.py
+      - name: Verify release-facing documentation is current
+        run: |
+          python scripts/validate_release_documentation.py
+          python -m unittest discover -s tests -p test_release_documentation.py
       - uses: home-assistant/actions/hassfest@master
 
   hacs:

@@ -44,6 +44,8 @@ jobs:
 
       - name: Require detailed release notes
         run: python scripts/validate_release_notes.py
+      - name: Verify README, changelog and manifest versions agree
+        run: python scripts/validate_release_documentation.py
 
       - name: Publish documented GitHub release and repair existing notes
         env:
