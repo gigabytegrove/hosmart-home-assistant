@@ -36,9 +36,9 @@ For the HS006W, the receiver exposes normal status locally but does not expose d
 
 ## Current release
 
-**Current integration version: v0.2.9-dev.1**
+**Current integration version: v0.2.9-dev.2**
 
-**Development preview:** v0.2.9-dev.1 is a prerelease built from `dev`. The production release remains [v0.2.8](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.8) from `main`. Use HACS's specific-version chooser to install the beta (or use the new **Software channel** and **Install selected channel** controls when HACS exposes a supported update entity). Selecting a channel alone does **not** install software. All installs require a Home Assistant restart. Power/Volume and ZoneAlarming writes are not hardware-qualified on HS006W.
+**Development preview:** v0.2.9-dev.2 is an opt-in prerelease built from `dev`. The production release remains [v0.2.8](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.8) on `main`. This preview moves scheduling into a single organized form (**Default**, **Ch. 1**, **Ch. 2**, **Ch. 3**, **Ch. 4**) and keeps the stable release unchanged. Independent receiver-tone mute is **not hardware-qualified and is not offered as a functioning control**.
 
 ## Main and dev installation channels
 
@@ -222,86 +222,67 @@ To enable Hybrid mode:
 
 The credentials are used to connect the existing receiver entry to the correct Ho-Smart account and are then discarded.
 
-## Nighttime quiet hours — direct device controls (v0.2.8)
+## Nighttime schedules — Default and Ch. 1–4 (v0.2.9-dev.2)
 
-**You do not need to run Configure to set quiet hours.** The old two-step
-receiver/channel wizard was removed because routine settings belong on the
-receiver's Home Assistant **device page**. Existing schedules from v0.2.6
-and v0.2.7 stay intact. There is no re-pairing, factory reset, or migration.
+For the HS006W, open **Settings → Devices & services → Ho-Smart &
+eMACROS → Configure**. The schedule editor is now **one page, one save**,
+using Home Assistant's native expandable sections rather than the 15+ flat
+time/select controls shown in the previous device-page Configuration list.
 
-After upgrading through HACS and restarting Home Assistant:
+- **Default** — Enabled, Action, Start, End. Start is **10:00 PM** and End
+  **7:00 AM** unless previously customized; the new action default for
+  fresh configurations is **Disarm zone**. Previously stored global mute or
+  power-off actions are preserved, not silently converted to disarm.
+- **Ch. 1**, **Ch. 2**, **Ch. 3**, **Ch. 4** — All available in the same
+  form, each with Mode (**Use Default**, **Always armed**, or **Custom
+  schedule**), Action (**Arm zone** or **Disarm zone**), Start, and End.
+  The four channel sections are collapsed initially for a compact view.
+- **Connection mode** — Remains available at the bottom. Local or Hybrid
+  connection is required to send commands to the receiver.
 
-1. Go to **Settings → Devices & services → Ho-Smart & eMACROS → Devices**.
-2. Open the relevant receiver. Its **Configuration** section includes the
-   receiver-wide quiet-hours switch, start/end time pickers, action selector,
-   and **all four** channel behavior selectors and time pickers at once.
-3. Choose the channels that must keep working. For example, set **Channel 1
-   overnight behavior** to **Always armed (protected)** if Channel 1 is the
-   driveway. Choose **Follow receiver-wide hours** for other channels, or
-   **Disarm on custom schedule** and set each channel's times.
-4. Turn on **Receiver overnight quiet hours** to enable the main schedule;
-   default hours are **10:00 PM–7:00 AM** in Home Assistant's timezone.
-5. Review **Night quiet status** and Channel 1–4 status diagnostics, and
-   confirm behavior physically before leaving schedules unattended.
+A channel on **Use Default** follows Default's action and hours.
+A channel on **Always armed** is never silenced by a global mute/power
+operation. **Custom schedule** uses that channel's independent hours and
+its own Arm/Disarm action. Previously entered hours are **retained** when
+you switch between Use Default and Custom.
 
-**Every channel is visible from the beginning.** Editing one channel saves
-that change alone, without requiring you to save Channel 1 to access Channel 2
-or running another configuration wizard. Settings change live and persist
-across Home Assistant restarts; schedules re-arm without reconnecting.
+Changes save together, preserving all receiver options, channel names,
+existing entity IDs, paired credentials and restoration intent. The active
+schedules re-arm without reconnecting the receiver. This is not a repeated
+onboarding or per-channel setup wizard.
 
-### Receiver-wide controls
+The superseded flat time/select entities are hidden once by the integration
+in Home Assistant's entity registry, **not deleted**. Their unique IDs
+remain available to existing automations and can be managed from the entity
+registry; the new grouped editor is the recommended interface. The
+**Default: Enable schedule** switch remains visible on the receiver
+device page for quick toggling. Direct arm/disarm switches remain under
+device controls.
 
-| Device entity | Purpose |
-| --- | --- |
-| Receiver overnight quiet hours | Enable/disable the main daily schedule |
-| Receiver quiet starts | Main quiet-hours start (10:00 PM default) |
-| Receiver quiet ends | Main quiet-hours end (7:00 AM default) |
-| Receiver quiet-hours action | Mute receiver audio, or power off receiver |
+### What the available actions really do
 
-### Channel controls — always available together
+| Action | Receiver behavior | Sensor events |
+| --- | --- | --- |
+| **Arm zone** | Schedule the selected ZoneAlarming flag on, then restore its previous value | Detection remains enabled |
+| **Disarm zone** | Schedule the selected ZoneAlarming flag off, then restore its previous value | Detection/cloud reporting may cease |
+| **Legacy: mute entire receiver** | Set the shared Volume to zero only if every channel is scheduled for that global action | Physical volume changes for every tone |
+| **Tone-only mute** | **Not available on verified HS006W** | No validated independent channel mute command exists |
 
-Each of the four channels exposes **Channel N overnight behavior**,
-**Channel N quiet starts**, **Channel N quiet ends**, and a direct
-**Channel N armed** switch. The mode choices are:
+The previously available whole-receiver Power Off setting is preserved
+for existing installations; it is unsafe to assume that Wi-Fi will remain
+available to switch the receiver back on later.
 
-- **Follow receiver-wide hours:** obey the main quiet-hours window.
-- **Always armed (protected):** do not schedule this channel off.
-  Protecting even one channel prevents receiver-wide mute/power-off.
-- **Disarm on custom schedule (stops detection):** independently choose
-  the hours when the named zone will be disarmed. You can edit the time
-  fields even if the channel has not yet been switched to this mode.
+**The HS006W has not been physically verified to accept these local
+property writes.** ESP Local Control supports property writes in general,
+but receiver-specific JSON setters may reject them. Writes are read back,
+and failures are logged and shown in diagnostics. The integration
+deliberately refuses to substitute disarming, shutting down the receiver,
+or changing its shared volume for a requested **tone-only mute**.
 
-Direct **Channel N armed** switches send an arm or disarm command to the
-receiver; they are different from the read-only historical armed-status
-binary sensors. While a schedule is active, its next evaluation can undo
-a conflicting manual change.
-
-If the receiver is Cloud-only, local receiver controls are unavailable.
-Open **Configure** only to change its connection mode, not to manage schedules.
-
-### Important receiver limitations
-
-A HS006W exposes **one receiver-wide volume** plus
-`ZoneAlarming1`–`ZoneAlarming4` armed flags. There is no validated
-per-channel audio-only volume control. Disarming a channel can suppress
-**the physical alarm and the cloud notification** for that channel.
-Do **not** schedule disarming for sensors whose detection you depend on.
-
-If all four channels are scheduled quiet during the receiver's quiet-hours
-window, the configured master action can mute/power-off the receiver. When
-any channel must remain active, the integration instead attempts to
-disarm only the scheduled channels. Prior armed/volume/power values are
-persisted before writes and restored when each quiet period ends, including
-after Home Assistant restarts.
-
-**Write support still requires real hardware testing.** ESP Local Control
-defines property writes, but Ho-Smart/eMACROS firmware may reject partial
-JSON `params` writes. The integration checks protocol acknowledgement and
-reads back state; failed writes show as errors rather than silently
-claiming success. **Power-off may disable the receiver's Wi-Fi**, so
-automatic power-on could be impossible without manual intervention.
-Try changes with the hardware available to you, preferably starting
-with volume mute.
+If tone-only muting is essential, the device's supported channel-specific
+volume/mute command must first be established from vendor protocol evidence
+or a sanitized device-parameter capture and verified against the hardware.
+The dev build does not claim that capability yet.
 
 ## Privacy and security
 

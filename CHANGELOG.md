@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.9-dev.2
+
+**Purpose:** Replace the cluttered numbered entity list with a single clear, grouped schedule editor and prevent the quiet-hours engine from incorrectly treating disarming as tone-only muting.
+
+- Configure **Default** plus **Ch. 1–4** in one Home Assistant options form with collapsible sections and one save; no multi-step or channel-by-channel wizard.
+- Default has enabled/action/start/end; each channel has Use Default, Always armed, or Custom plus arm/disarm action and start/end.
+- Keep old per-channel schedules and unique IDs; hide the superseded flat time/select controls without deleting them or breaking existing automations.
+- Support scheduled **Arm zone** and **Disarm zone**, preserving original states across restarts, including when a selected action changes while its window is active.
+- Explicitly reject channel-tone muting where no verified per-channel mute parameter exists; never silently disarm or change shared volume as a substitute.
+- Guard the legacy whole-receiver mute/power-off options against protected channels and document the risks.
+- Preserve the dual-brand Ho-Smart/eMACROS naming and the main/dev release split.
+
+**Limitations:** HS006W property writes still require physical-device verification. Device-independent tone muting is not implemented without evidence of a supported control.
+
+See [v0.2.9-dev.2 release notes](.github/release-notes/v0.2.9-dev.2.md).
+
+
 ## 0.2.9-dev.1
 
 **Purpose:** Preview corrected mobile-friendly quiet-hours labeling and the new main/dev development/release split without changing the v0.2.8 production build.
