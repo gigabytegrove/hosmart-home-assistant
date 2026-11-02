@@ -1,39 +1,57 @@
 name: Dev Prerelease
 
 on:
-  workflow_run:
-    workflows:
-      - Validate
-    types:
-      - completed
+  push:
     branches:
       - dev
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   prerelease:
-    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out validated development commit
+      - name: Check out this dev commit
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
-      - name: Publish exact verified dev commit, never main
+      - name: Compile integration Python
+        run: python -m compileall -q custom_components/hosmart
+
+      - name: Verify all scheduled and persistence unit tests
+        run: |
+          python -m unittest discover -s tests -p test_night_schedule.py
+          python -m unittest discover -s tests -p test_channel_quiet.py
+          python -m unittest discover -s tests -p test_quiet_settings.py
+          python -m unittest discover -s tests -p test_release_versions.py
+          python -m unittest discover -s tests -p test_release_documentation.py
+
+      - name: Verify versioned release documentation and notes
+        run: |
+          python scripts/validate_release_documentation.py
+          python scripts/validate_release_notes.py
+
+      - name: Home Assistant Hassfest validation
+        uses: home-assistant/actions/hassfest@master
+
+      - name: Validate HACS integration layout
+        uses: hacs/action@main
+        with:
+          category: integration
+
+      - name: Publish only current, validated dev commit as a prerelease
         env:
           GH_TOKEN: ${{ github.token }}
-          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+          VALIDATED_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
-
           git fetch origin dev main
           if [[ "$(git rev-parse origin/dev)" != "$VALIDATED_SHA" ]]; then
-            echo "Skipping superseded dev validation."
+            echo "Skipping superseded dev commit."
             exit 0
           fi
           VERSION="$(python - <<'PY'
@@ -43,21 +61,16 @@ jobs:
           PY
           )"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]]; then
-            echo "Not a prerelease manifest; no dev release."
+            echo "Manifest is not a development version; no prerelease published."
             exit 0
           fi
-
-          python scripts/validate_release_notes.py
-          python scripts/validate_release_documentation.py
-
           TAG="v$VERSION"
           NOTES=".github/release-notes/$TAG.md"
           test -s "$NOTES"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "$TAG already exists; never alter immutable release."
+            echo "Immutable prerelease $TAG already exists."
             exit 0
           fi
-
           gh release create "$TAG" \
             --target "$VALIDATED_SHA" \
             --title "Ho-Smart & eMACROS $TAG — Development" \
