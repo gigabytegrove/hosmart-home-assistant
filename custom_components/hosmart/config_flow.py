@@ -43,6 +43,7 @@ from .const import (
     CONF_QUIET_ENABLED,
     CONF_QUIET_END,
     CONF_QUIET_START,
+    CONF_RELEASE_CHANNEL,
     CONF_USER_ID,
     DEFAULT_MODE,
     DEFAULT_PORT,
@@ -56,6 +57,12 @@ from .const import (
 )
 from .night_schedule import parse_time
 from .settings import merge_schedule_section, updated_quiet_options
+
+
+UPDATE_CHANNEL_OPTIONS = [
+    {"value": "main", "label": "Main — stable releases"},
+    {"value": "dev", "label": "Development — nightly prereleases"},
+]
 
 
 MODE_OPTIONS = [
@@ -218,7 +225,10 @@ class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return self.async_create_entry(
                         title=str(title),
                         data=data,
-                        options={CONF_MODE: mode},
+                        options={
+                            CONF_MODE: mode,
+                            CONF_RELEASE_CHANNEL: user_input[CONF_RELEASE_CHANNEL],
+                        },
                     )
 
             except HosmartCloudAuthError:
@@ -246,6 +256,14 @@ class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_MODE, default=DEFAULT_MODE): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=MODE_OPTIONS,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_RELEASE_CHANNEL, default="main"
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=UPDATE_CHANNEL_OPTIONS,
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
@@ -401,6 +419,10 @@ class HosmartOptionsFlow(OptionsFlow):
                     options[CONF_CHANNEL_QUIET] = rules
                     selected_mode = provided[CONF_MODE]
                     options[CONF_MODE] = selected_mode
+                    release_channel = provided[CONF_RELEASE_CHANNEL]
+                    if release_channel not in ("main", "dev"):
+                        raise ValueError("Unknown integration update channel")
+                    options[CONF_RELEASE_CHANNEL] = release_channel
                     # Check mode after merging all fields; a Cloud-only
                     # transition cannot abandon pending local restoration.
                     options = updated_quiet_options(
@@ -539,6 +561,17 @@ class HosmartOptionsFlow(OptionsFlow):
         fields[pvol.Required(
             CONF_MODE, default=provided.get(CONF_MODE, current_mode)
         )] = self._mode_selector()
+        fields[pvol.Required(
+            CONF_RELEASE_CHANNEL,
+            default=provided.get(
+                CONF_RELEASE_CHANNEL, old.get(CONF_RELEASE_CHANNEL, "main")
+            ),
+        )] = selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=UPDATE_CHANNEL_OPTIONS,
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        )
         return self.async_show_form(
             step_id="init",
             data_schema=pvol.Schema(fields),
