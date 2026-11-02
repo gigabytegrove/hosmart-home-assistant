@@ -52,8 +52,12 @@ class HosmartQuietTime(HosmartEntity, TimeEntity):
         super().__init__(coordinator, f"{prefix}_quiet_{boundary}")
         self._channel = channel
         self._boundary = boundary
-        display = "Receiver" if channel is None else f"Channel {channel}"
-        self._attr_name = f"{display} quiet {'starts' if boundary == 'start' else 'ends'}"
+        # The device page sorts entities by display name, not by registration
+        # order. Short, numbered labels keep each pair readable on mobile and
+        # make START appear before END instead of the reverse.
+        group = "Main" if channel is None else f"Ch {channel}"
+        order = "1 Start" if boundary == "start" else "2 End"
+        self._attr_name = f"{group} · {order}"
 
     @property
     def native_value(self) -> time:
