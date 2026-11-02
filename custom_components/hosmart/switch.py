@@ -31,7 +31,7 @@ async def async_setup_entry(
 class HosmartQuietEnabled(HosmartEntity, SwitchEntity):
     """Opt in or out of receiver-wide night quiet hours."""
 
-    _attr_name = "Receiver overnight quiet hours"
+    _attr_name = "00 Main: Quiet hours"
     _attr_icon = "mdi:weather-night"
     _attr_entity_category = EntityCategory.CONFIG
 

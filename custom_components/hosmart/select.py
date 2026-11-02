@@ -63,8 +63,8 @@ class HosmartQuietSelect(HosmartEntity, SelectEntity):
         self._choices = RECEIVER_ACTIONS if channel is None else CHANNEL_ACTIONS
         self._attr_options = list(self._choices)
         self._attr_name = (
-            "Receiver quiet-hours action" if channel is None
-            else f"Channel {channel} overnight behavior"
+            "01 Main: Action" if channel is None
+            else f"{channel}0 Ch{channel}: Mode"
         )
 
     @property
@@ -91,7 +91,7 @@ class HosmartQuietSelect(HosmartEntity, SelectEntity):
 class HosmartSoftwareChannel(HosmartEntity, SelectEntity):
     """Persist the requested HACS installation channel; no automatic install."""
 
-    _attr_name = "Software channel"
+    _attr_name = "90 Software channel"
     _attr_icon = "mdi:source-branch"
     _attr_entity_category = EntityCategory.CONFIG
     _attr_options = ["Main (stable)", "Dev (beta)"]

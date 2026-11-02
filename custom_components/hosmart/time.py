@@ -55,9 +55,17 @@ class HosmartQuietTime(HosmartEntity, TimeEntity):
         # The device page sorts entities by display name, not by registration
         # order. Short, numbered labels keep each pair readable on mobile and
         # make START appear before END instead of the reverse.
-        group = "Main" if channel is None else f"Ch {channel}"
-        order = "1 Start" if boundary == "start" else "2 End"
-        self._attr_name = f"{group} · {order}"
+        # Home Assistant orders the configuration list by entity name.
+        # Stable numeric groups keep master before channels, and Start
+        # immediately before End in the narrow device-page layout.
+        if channel is None:
+            order = "02" if boundary == "start" else "03"
+            self._attr_name = f"{order} Main: {'Start' if boundary == 'start' else 'End'}"
+        else:
+            order = f"{channel}1" if boundary == "start" else f"{channel}2"
+            self._attr_name = (
+                f"{order} Ch{channel}: {'Start' if boundary == 'start' else 'End'}"
+            )
 
     @property
     def native_value(self) -> time:
