@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.9-dev.3
+
+**Purpose:** Prevent accidental edits to inactive channel schedules by hiding irrelevant controls and retaining saved schedules.
+
+- Default Action, Start, and End hide whenever the Default schedule is disabled on Home Assistant Core 2026.11+.
+- A channel's Action, Start, and End appear **only** when its mode is Custom; selecting Off or Use Default hides all three immediately.
+- Off is explicitly named **Off (no schedule; keep current zone state)**, so an inactive schedule is not confused with a command to disarm the channel.
+- Fields hidden by the Home Assistant form are omitted from submission; a dedicated merge function preserves their last configured action and start/end times without resetting them.
+- Add regression tests for toggling Off and back to Custom, inheriting Default, and preserving disabled receiver schedule values.
+- Preserve the main/dev release boundary, all entity IDs and existing config entries.
+
+**Compatibility:** The live visible-field conditions require Home Assistant Core 2026.11+. Older versions retain the compatible form but cannot hide fields dynamically. HS006W receiver writes and tone-only mute remain unverified.
+
+See [v0.2.9-dev.3 release notes](.github/release-notes/v0.2.9-dev.3.md).
+
+
 ## 0.2.9-dev.2
 
 **Purpose:** Replace the cluttered numbered entity list with a single clear, grouped schedule editor and prevent the quiet-hours engine from incorrectly treating disarming as tone-only muting.

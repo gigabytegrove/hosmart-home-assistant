@@ -36,9 +36,9 @@ For the HS006W, the receiver exposes normal status locally but does not expose d
 
 ## Current release
 
-**Current integration version: v0.2.9-dev.2**
+**Current integration version: v0.2.9-dev.3**
 
-**Development preview:** v0.2.9-dev.2 is an opt-in prerelease built from `dev`. The production release remains [v0.2.8](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.8) on `main`. This preview moves scheduling into a single organized form (**Default**, **Ch. 1**, **Ch. 2**, **Ch. 3**, **Ch. 4**) and keeps the stable release unchanged. Independent receiver-tone mute is **not hardware-qualified and is not offered as a functioning control**.
+**Development preview:** v0.2.9-dev.3 is an opt-in prerelease from `dev`. Production remains [v0.2.8](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.8) on `main`. This version hides Action/Start/End when a channel's schedule is Off or inherited, and hides the Default schedule fields when Default is disabled on Home Assistant Core 2026.11 or newer. Your previously saved schedule values are kept.
 
 ## Main and dev installation channels
 
@@ -67,15 +67,41 @@ builds concurrently under the same domain. The `dev` release is **not**
 automatically promoted to `main`: it must pass validation and be merged.
 For development status, see the [dev branch](https://github.com/gigabytegrove/hosmart-home-assistant/tree/dev).
 
-## Configuration labels on narrow screens
+## Conditional schedule fields
 
-The Configuration section uses concise, ordered labels:
-**00 Main: Quiet hours**, **01 Main: Action**, **02 Main: Start**,
-**03 Main: End**, followed by **10 Ch1: Mode**, **11 Ch1: Start**,
-**12 Ch1: End** through Channel 4. These are one start/end pair per channel,
-**not duplicated schedules**. Previous labels were both truncated to
-“Channel N quiet…” and alphabetical sorting could put End above Start.
-Only display names change; stored times and entity unique IDs remain intact.
+The receiver schedule is edited in a single Home Assistant **Configure**
+form with five sections: **Default**, **Ch. 1**, **Ch. 2**, **Ch. 3**,
+and **Ch. 4**. There is no step-by-step channel wizard or numbered
+flat list to adjust.
+
+On **Home Assistant Core 2026.11 or newer**:
+
+- When **Default → Enabled** is **Off**, Default Action, Start, and End
+  are **hidden** and cannot be edited accidentally.
+- When a channel is **Off (no schedule)**, only its Schedule selector
+  remains visible. Its Action, Start, and End immediately disappear.
+- When a channel is **Use Default**, it inherits Default; its own
+  Action, Start, and End remain hidden.
+- When a channel is **Use this channel's schedule**, Action, Start,
+  and End immediately appear. Editing these values affects only that
+  channel.
+
+Home Assistant leaves hidden fields **out of submitted form data**.
+The integration explicitly preserves the last saved action/start/end for
+every hidden section instead of resetting or overwriting them. Turning a
+schedule back on restores the old times for editing.
+
+Earlier Home Assistant Core versions lack the dynamic visibility API,
+so their form may still show fields that would be hidden in 2026.11.
+The compatibility fallback retains existing configuration but cannot
+provide live conditional field hiding. Upgrade Home Assistant Core to
+2026.11+ for the requested hide/show behavior.
+
+**Off** means **no scheduled action** and does not forcibly arm or disarm
+the channel. **Disarm** is a separate action which may prevent detection
+or cloud alarm reporting, not just silence the audible tone. Independent
+tone-only muting has not yet been established as a supported HS006W
+hardware command.
 
 ## Installation with HACS
 
@@ -258,6 +284,19 @@ registry; the new grouped editor is the recommended interface. The
 **Default: Enable schedule** switch remains visible on the receiver
 device page for quick toggling. Direct arm/disarm switches remain under
 device controls.
+
+### Conditional field visibility
+
+On Home Assistant Core **2026.11+**, Default's Action/Start/End controls
+are shown only if Default is Enabled. Each channel's Action/Start/End
+controls show only if its Schedule is **Use this channel's schedule**.
+When its Schedule is **Off** or **Use Default**, no channel start/end
+time pickers are shown. Hidden inputs cannot be inadvertently edited,
+and saving the form preserves the saved times and action for later use.
+
+Earlier Home Assistant Core versions cannot hide these fields dynamically;
+they retain a compatibility form. All schedule values persist across
+the transition to Core 2026.11+.
 
 ### What the available actions really do
 
