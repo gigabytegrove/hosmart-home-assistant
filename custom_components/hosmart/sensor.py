@@ -46,6 +46,38 @@ def _udp_time_value(coordinator: HosmartCoordinator) -> str:
 
 SENSORS = (
     HosmartSensorDescription(
+        key="channel_1_quiet_status",
+        name="Channel 1 quiet status",
+        icon="mdi:volume-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        requires_local=True,
+        value_fn=lambda c: c.channel_quiet_status.get(1, "active"),
+    ),
+    HosmartSensorDescription(
+        key="channel_2_quiet_status",
+        name="Channel 2 quiet status",
+        icon="mdi:volume-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        requires_local=True,
+        value_fn=lambda c: c.channel_quiet_status.get(2, "active"),
+    ),
+    HosmartSensorDescription(
+        key="channel_3_quiet_status",
+        name="Channel 3 quiet status",
+        icon="mdi:volume-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        requires_local=True,
+        value_fn=lambda c: c.channel_quiet_status.get(3, "active"),
+    ),
+    HosmartSensorDescription(
+        key="channel_4_quiet_status",
+        name="Channel 4 quiet status",
+        icon="mdi:volume-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        requires_local=True,
+        value_fn=lambda c: c.channel_quiet_status.get(4, "active"),
+    ),
+    HosmartSensorDescription(
         key="night_quiet_status",
         name="Night quiet status",
         icon="mdi:weather-night",

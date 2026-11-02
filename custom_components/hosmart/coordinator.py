@@ -105,6 +105,9 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.local_available = not self.local_enabled
         self.cloud_available = not self.cloud_enabled
         self.quiet_status = "disabled"
+        self.channel_quiet_status: dict[int, str] = {
+            i: "active" for i in range(1, 5)
+        }
 
         self.poll_count = 0
         self.change_count = 0

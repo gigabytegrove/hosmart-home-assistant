@@ -27,8 +27,8 @@
   "options": {
     "step": {
       "init": {
-        "title": "Ho-Smart receiver settings",
-        "description": "Configure connection mode and optional per-receiver nighttime quiet hours. Mute audio preserves network access and alarm reporting. Power off can disconnect some receivers, preventing automatic restoration.",
+        "title": "Receiver-wide quiet hours",
+        "description": "Configure the receiver's connection mode and default quiet-hours window. Continue to configure Channels 1–4 individually; protecting a channel prevents master volume/power changes that would silence it.",
         "data": {
           "connection_mode": "Connection mode",
           "quiet_enabled": "Enable nightly quiet hours for this receiver",
@@ -43,6 +43,24 @@
         "data": {
           "username": "Ho-Smart account email",
           "password": "Ho-Smart account password"
+        }
+      },
+      "channels": {
+        "title": "Channel-specific quiet hours",
+        "description": "Select which channels inherit the receiver schedule, stay active overnight, or use their own schedule. Channel names: {channel_names}. Per-channel control uses ZoneAlarming (disarm), not independent volume; a disarmed zone may also stop generating cloud alerts.",
+        "data": {
+          "channel_1_mode": "Channel 1 behavior",
+          "channel_1_start": "Channel 1 quiet starts",
+          "channel_1_end": "Channel 1 quiet ends",
+          "channel_2_mode": "Channel 2 behavior",
+          "channel_2_start": "Channel 2 quiet starts",
+          "channel_2_end": "Channel 2 quiet ends",
+          "channel_3_mode": "Channel 3 behavior",
+          "channel_3_start": "Channel 3 quiet starts",
+          "channel_3_end": "Channel 3 quiet ends",
+          "channel_4_mode": "Channel 4 behavior",
+          "channel_4_start": "Channel 4 quiet starts",
+          "channel_4_end": "Channel 4 quiet ends"
         }
       }
     },
