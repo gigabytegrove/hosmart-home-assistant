@@ -46,4 +46,10 @@ EVENT_ACTIVITY = "hosmart_activity"
 EVENT_ALERT = "hosmart_alert"
 EVENT_UDP_PACKET = "hosmart_udp_packet"
 
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
+PLATFORMS = [
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+    Platform.SWITCH,
+    Platform.SELECT,
+    Platform.TIME,
+]

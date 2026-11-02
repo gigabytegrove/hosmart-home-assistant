@@ -27,14 +27,10 @@
   "options": {
     "step": {
       "init": {
-        "title": "Receiver-wide quiet hours",
-        "description": "Configure the receiver's connection mode and default quiet-hours window. Continue to configure Channels 1–4 individually; protecting a channel prevents master volume/power changes that would silence it.",
+        "title": "Connection mode",
+        "description": "Choose how this receiver connects to Home Assistant. Nighttime quiet hours, individual channel schedules, and arm/disarm switches are on the receiver's device page under Configuration; you do not need Configure for everyday settings.",
         "data": {
-          "connection_mode": "Connection mode",
-          "quiet_enabled": "Enable nightly quiet hours for this receiver",
-          "quiet_start": "Quiet hours begin (Home Assistant local time)",
-          "quiet_end": "Quiet hours end (Home Assistant local time)",
-          "quiet_action": "Quiet-hours action"
+          "connection_mode": "Connection mode"
         }
       },
       "cloud_credentials": {
@@ -44,33 +40,13 @@
           "username": "My Hosmart account email",
           "password": "My Hosmart account password"
         }
-      },
-      "channels": {
-        "title": "Channel-specific quiet hours",
-        "description": "Select which channels inherit the receiver schedule, stay active overnight, or use their own schedule. Channel names: {channel_names}. Per-channel control uses ZoneAlarming (disarm), not independent volume; a disarmed zone may also stop generating cloud alerts.",
-        "data": {
-          "channel_1_mode": "Channel 1 behavior",
-          "channel_1_start": "Channel 1 quiet starts",
-          "channel_1_end": "Channel 1 quiet ends",
-          "channel_2_mode": "Channel 2 behavior",
-          "channel_2_start": "Channel 2 quiet starts",
-          "channel_2_end": "Channel 2 quiet ends",
-          "channel_3_mode": "Channel 3 behavior",
-          "channel_3_start": "Channel 3 quiet starts",
-          "channel_3_end": "Channel 3 quiet ends",
-          "channel_4_mode": "Channel 4 behavior",
-          "channel_4_start": "Channel 4 quiet starts",
-          "channel_4_end": "Channel 4 quiet ends"
-        }
       }
     },
     "error": {
       "invalid_cloud_auth": "The My Hosmart email or password was not accepted.",
       "cloud_error": "Could not communicate with the My Hosmart service.",
       "cannot_match_device": "This My Hosmart account does not contain the receiver already configured in Home Assistant.",
-      "quiet_requires_local": "Quiet hours require Local or Hybrid mode to communicate with this receiver.",
-      "quiet_times_equal": "Start and end times must differ.",
-      "quiet_times_invalid": "Enter valid local times for quiet hours."
+      "quiet_requires_local": "Quiet hours require Local or Hybrid mode to communicate with this receiver."
     }
   }
 }

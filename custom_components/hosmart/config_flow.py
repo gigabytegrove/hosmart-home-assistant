@@ -23,7 +23,6 @@ from .cloud import (
     HosmartCloudError,
     get_account_setup,
 )
-from .night_schedule import parse_time
 from .const import (
     CONF_CHANNEL_NAMES,
     CONF_CHANNEL_QUIET,
@@ -32,14 +31,8 @@ from .const import (
     CHANNEL_CUSTOM,
     CONF_MODE,
     CONF_QUIET_ENABLED,
-    CONF_QUIET_START,
-    CONF_QUIET_END,
-    CONF_QUIET_ACTION,
-    DEFAULT_QUIET_ACTION,
-    DEFAULT_QUIET_START,
-    DEFAULT_QUIET_END,
-    QUIET_ACTION_MUTE,
-    QUIET_ACTION_POWER,
+    CONF_CHANNEL_QUIET,
+    CHANNEL_CUSTOM,
     CONF_NODE_ID,
     CONF_POP,
     CONF_USER_ID,
@@ -264,217 +257,54 @@ class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class HosmartOptionsFlow(OptionsFlow):
-    """Configure Local / Cloud / Hybrid runtime behavior."""
+    """Connection mode only; quiet hours are editable device entities."""
 
     _pending_mode: str | None = None
     _pending_options: dict[str, Any] | None = None
 
     async def async_step_init(self, user_input=None) -> ConfigFlowResult:
-        """Choose the runtime mode."""
+        """Keep Configure limited to connection mode, not everyday schedules."""
         current = self.config_entry.options.get(
             CONF_MODE,
             MODE_LOCAL if CONF_USER_ID not in self.config_entry.data else DEFAULT_MODE,
         )
-
         errors: dict[str, str] = {}
         if user_input is not None:
             mode = user_input[CONF_MODE]
-            enabled = user_input[CONF_QUIET_ENABLED]
-            start = user_input[CONF_QUIET_START]
-            end = user_input[CONF_QUIET_END]
-            if mode == MODE_CLOUD and (
-                enabled or self.config_entry.options.get(CONF_QUIET_ENABLED, False)
-            ):
-                # Disable and restore in Local/Hybrid first, then change mode.
-                errors["base"] = "quiet_requires_local"
-            else:
-                try:
-                    if parse_time(start) == parse_time(end):
-                        errors["base"] = "quiet_times_equal"
-                except (ValueError, TypeError):
-                    errors["base"] = "quiet_times_invalid"
-
+            options = {**self.config_entry.options, CONF_MODE: mode}
+            if mode == MODE_CLOUD:
+                rules = options.get(CONF_CHANNEL_QUIET, {})
+                custom = any(
+                    isinstance(rule, dict) and rule.get("mode") == CHANNEL_CUSTOM
+                    for rule in (rules.values() if isinstance(rules, dict) else [])
+                )
+                runtime = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+                quiet = runtime.get("quiet") if runtime else None
+                has_restore = bool(getattr(quiet, "_managed", {}))
+                if options.get(CONF_QUIET_ENABLED) or custom or has_restore:
+                    errors["base"] = "quiet_requires_local"
             if not errors:
-                options = {
-                    **self.config_entry.options,
-                    CONF_MODE: mode,
-                    CONF_QUIET_ENABLED: enabled,
-                    CONF_QUIET_START: start,
-                    CONF_QUIET_END: end,
-                    CONF_QUIET_ACTION: user_input[CONF_QUIET_ACTION],
-                }
-                self._pending_mode = mode
-                self._pending_options = options
-                return await self.async_step_channels()
-
-        options = self.config_entry.options
-        submitted = user_input or {}
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_MODE, default=submitted.get(CONF_MODE, current)
-                    ): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=MODE_OPTIONS,
-                            mode=selector.SelectSelectorMode.DROPDOWN,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_QUIET_ENABLED,
-                        default=submitted.get(
-                            CONF_QUIET_ENABLED,
-                            options.get(CONF_QUIET_ENABLED, False),
-                        ),
-                    ): selector.BooleanSelector(),
-                    vol.Required(
-                        CONF_QUIET_START,
-                        default=submitted.get(
-                            CONF_QUIET_START,
-                            options.get(CONF_QUIET_START, DEFAULT_QUIET_START),
-                        ),
-                    ): selector.TimeSelector(),
-                    vol.Required(
-                        CONF_QUIET_END,
-                        default=submitted.get(
-                            CONF_QUIET_END,
-                            options.get(CONF_QUIET_END, DEFAULT_QUIET_END),
-                        ),
-                    ): selector.TimeSelector(),
-                    vol.Required(
-                        CONF_QUIET_ACTION,
-                        default=submitted.get(
-                            CONF_QUIET_ACTION,
-                            options.get(CONF_QUIET_ACTION, DEFAULT_QUIET_ACTION),
-                        ),
-                    ): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[
-                                {
-                                    "value": QUIET_ACTION_MUTE,
-                                    "label": "Mute audio (restore previous volume)",
-                                },
-                                {
-                                    "value": QUIET_ACTION_POWER,
-                                    "label": "Power off (restore previous power state)",
-                                },
-                            ],
-                            mode=selector.SelectSelectorMode.DROPDOWN,
-                        )
-                    ),
-                }
-            ),
-            errors=errors,
-        )
-
-    async def async_step_channels(self, user_input=None) -> ConfigFlowResult:
-        """Configure independent channel policies after receiver-wide settings."""
-        errors: dict[str, str] = {}
-        defaults = self.config_entry.options.get(CONF_CHANNEL_QUIET, {})
-        if not isinstance(defaults, dict):
-            defaults = {}
-        submitted = user_input or {}
-
-        if user_input is not None:
-            configured: dict[str, dict[str, str]] = {}
-            for index in range(1, 5):
-                prefix = f"channel_{index}_"
-                rule = {
-                    "mode": submitted[prefix + "mode"],
-                    "start": submitted[prefix + "start"],
-                    "end": submitted[prefix + "end"],
-                }
-                if rule["mode"] == CHANNEL_CUSTOM:
-                    try:
-                        if parse_time(rule["start"]) == parse_time(rule["end"]):
-                            errors["base"] = "quiet_times_equal"
-                    except (TypeError, ValueError):
-                        errors["base"] = "quiet_times_invalid"
-                configured[str(index)] = rule
-
-            mode = (self._pending_options or {}).get(CONF_MODE)
-            old_custom = any(
-                isinstance(rule, dict) and rule.get("mode") == CHANNEL_CUSTOM
-                for rule in defaults.values()
-            )
-            new_custom = any(
-                rule["mode"] == CHANNEL_CUSTOM for rule in configured.values()
-            )
-            if mode == MODE_CLOUD and (old_custom or new_custom):
-                # Disarm state must be restored before leaving local control.
-                errors["base"] = "quiet_requires_local"
-
-            if not errors:
-                options = {
-                    **(self._pending_options or self.config_entry.options),
-                    CONF_CHANNEL_QUIET: configured,
-                }
                 if mode in (MODE_CLOUD, MODE_HYBRID) and not self.config_entry.data.get(
                     CONF_USER_ID
                 ):
+                    self._pending_mode = mode
                     self._pending_options = options
                     return await self.async_step_cloud_credentials()
                 return self.async_create_entry(data=options)
 
-        fields: dict[Any, Any] = {}
-        for index in range(1, 5):
-            prefix = f"channel_{index}_"
-            stored = defaults.get(str(index), {})
-            if not isinstance(stored, dict):
-                stored = {}
-            fields[
-                vol.Required(
-                    prefix + "mode",
-                    default=submitted.get(
-                        prefix + "mode", stored.get("mode", CHANNEL_INHERIT)
-                    ),
-                )
-            ] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=[
-                        {
-                            "value": CHANNEL_INHERIT,
-                            "label": "Follow receiver-wide schedule",
-                        },
-                        {
-                            "value": CHANNEL_ALWAYS_ACTIVE,
-                            "label": "Always active (protect this channel)",
-                        },
-                        {
-                            "value": CHANNEL_CUSTOM,
-                            "label": "Custom channel quiet hours",
-                        },
-                    ],
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                )
-            )
-            for suffix, default_time in (
-                ("start", DEFAULT_QUIET_START),
-                ("end", DEFAULT_QUIET_END),
-            ):
-                fields[
-                    vol.Required(
-                        prefix + suffix,
-                        default=submitted.get(
-                            prefix + suffix,
-                            stored.get(suffix, default_time),
-                        ),
-                    )
-                ] = selector.TimeSelector()
-
-        names = self.config_entry.data.get(CONF_CHANNEL_NAMES) or {}
-        if not isinstance(names, dict):
-            names = {}
-        labels = " · ".join(
-            f"CH{index}: {str(names.get(str(index)) or 'Unnamed')[:50]}"
-            for index in range(1, 5)
-        )
         return self.async_show_form(
-            step_id="channels",
-            data_schema=vol.Schema(fields),
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_MODE, default=current): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=MODE_OPTIONS,
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
+                    )
+                }
+            ),
             errors=errors,
-            description_placeholders={"channel_names": labels},
         )
 
     async def async_step_cloud_credentials(

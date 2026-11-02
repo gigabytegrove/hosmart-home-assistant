@@ -76,6 +76,7 @@ class HosmartQuietHours:
         self._store = Store(hass, 1, f"hosmart_quiet_{entry.entry_id}")
         self._managed: dict[str, Any] = {}
         self._unsubs: list[Any] = []
+        self._time_unsubs: list[Any] = []
         self._task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
         self._stopped = False
@@ -128,17 +129,24 @@ class HosmartQuietHours:
                     )
 
         self._unsubs.append(self.coordinator.async_add_listener(self._queue))
+        self._register_boundaries()
+        await self.async_reconcile()
+
+    def _register_boundaries(self) -> None:
+        """Register every receiver and per-channel time without a reload."""
         boundaries = {self.start, self.end}
         for rule in self.channels.values():
             if isinstance(rule, dict) and rule.get("mode") == CHANNEL_CUSTOM:
                 boundaries.update(
-                    (rule.get("start", DEFAULT_QUIET_START),
-                     rule.get("end", DEFAULT_QUIET_END))
+                    (
+                        rule.get("start", DEFAULT_QUIET_START),
+                        rule.get("end", DEFAULT_QUIET_END),
+                    )
                 )
         try:
             for boundary in boundaries:
                 parsed = parse_time(boundary)
-                self._unsubs.append(
+                self._time_unsubs.append(
                     async_track_time_change(
                         self.hass,
                         self._on_boundary,
@@ -148,14 +156,28 @@ class HosmartQuietHours:
                     )
                 )
         except (ValueError, TypeError):
-            _LOGGER.error("Ho-Smart %s has an invalid quiet-hours time", self.entry.title)
+            _LOGGER.exception(
+                "Ho-Smart %s has an invalid quiet-hours boundary", self.entry.title
+            )
             self._set_status("error")
+
+    async def async_options_updated(self) -> None:
+        """Rearm all time triggers and apply edits without reconnecting."""
+        if self._stopped:
             return
+        for unsub in self._time_unsubs:
+            unsub()
+        self._time_unsubs.clear()
+        self._register_boundaries()
+        self._retry_after.clear()
         await self.async_reconcile()
 
     async def async_stop(self) -> None:
         """Stop scheduling without clearing saved morning restoration intent."""
         self._stopped = True
+        for unsub in self._time_unsubs:
+            unsub()
+        self._time_unsubs.clear()
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
