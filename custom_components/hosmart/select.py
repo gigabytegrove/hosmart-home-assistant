@@ -51,7 +51,9 @@ async def async_setup_entry(
 
 
 class HosmartQuietSelect(HosmartEntity, SelectEntity):
-    """Change an individual schedule mode without an options wizard."""
+    """Retained for existing automations; new settings use grouped sections."""
+
+    _attr_entity_registry_visible_default = False
 
     _attr_icon = "mdi:tune-vertical"
     _attr_entity_category = EntityCategory.CONFIG

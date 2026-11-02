@@ -40,7 +40,9 @@ async def async_setup_entry(
 
 
 class HosmartQuietTime(HosmartEntity, TimeEntity):
-    """Persist a local time-of-day without restarting Home Assistant integration."""
+    """Retained for existing automations; edited in the grouped schedule form."""
+
+    _attr_entity_registry_visible_default = False
 
     _attr_icon = "mdi:clock-outline"
     _attr_entity_category = EntityCategory.CONFIG
