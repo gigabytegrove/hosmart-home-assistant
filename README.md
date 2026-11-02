@@ -24,6 +24,7 @@ Ho-Smart for Home Assistant can provide:
 - Driveway alarm activity
 - Receiver power state
 - Volume
+- Optional per-receiver nighttime quiet hours (experimental receiver writes; disabled by default)
 - Internal battery level
 - Channel and zone information
 - Zone 1–4 armed states
@@ -35,9 +36,9 @@ For the HS006W, the receiver exposes normal status locally but does not expose d
 
 ## Current release
 
-**Current integration version: v0.2.5**
+**Current integration version: v0.2.6**
 
-See the [latest published GitHub Release](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest) for installation and upgrade information and the [v0.2.5 release notes](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.5) for this version's changes and limitations. v0.2.5 addresses intermittent cloud communication failures and alarm-history recovery; it cannot report driveway alarms that never reach Ho-Smart's cloud history.
+See the [latest published GitHub Release](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest) for installation and upgrade information and the [v0.2.6 release notes](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.6) for this version's changes, cautions, and limits. v0.2.6 introduces configurable overnight quiet hours per receiver. Receiver Power/Volume writes are experimental until validated on HS006W hardware; the existing local monitoring and cloud-alarm transport remain unchanged.
 
 ## Installation with HACS
 
@@ -181,11 +182,11 @@ To enable Hybrid mode:
 
 The credentials are used to connect the existing receiver entry to the correct Ho-Smart account and are then discarded.
 
-## Nighttime quiet hours (development branch — not in v0.2.5)
+## Nighttime quiet hours (v0.2.6)
 
-This feature is being implemented on `feature/nighttime-receiver-quiet-hours`.
-It is **not part of the published v0.2.5 release** and should not be
-considered verified on the HS006W until actual power/volume writes are tested.
+The schedules and options are available in v0.2.6. **Receiver write control
+has not been hardware-qualified on HS006W firmware 2.0**; users should confirm
+operation on their own receiver before relying on it unattended.
 
 For each configured receiver:
 
@@ -221,7 +222,7 @@ allow restoration before switching the receiver to Cloud-only mode.
 
 **Hardware qualification requirement:** The ESP Local Control protocol
 supports property writes, but the vendor-specific HS006W `params`
-write semantics have not been validated with real hardware in this branch.
+write semantics have not been validated with real hardware in this release.
 If the firmware rejects the command, the status becomes `error` and its
 existing read-only monitoring and cloud alarm ingestion remain available.
 
