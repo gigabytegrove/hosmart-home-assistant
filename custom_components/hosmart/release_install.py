@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from aiohttp import ClientTimeout
 from homeassistant.components.update import UpdateEntityFeature
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
@@ -74,7 +75,7 @@ async def async_latest_published_tag(hass: Any, channel: str) -> str:
         async with session.get(
             RELEASE_API,
             headers={"Accept": "application/vnd.github+json"},
-            timeout=15,
+            timeout=ClientTimeout(total=15),
             allow_redirects=False,
         ) as response:
             if response.status != 200:
