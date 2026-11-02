@@ -32,7 +32,8 @@ from .const import (
     QUIET_ACTION_POWER,
 )
 from .coordinator import HosmartCoordinator
-from .night_schedule import parse_time, plan_channel_quiet
+from .night_schedule import parse_time
+from .schedule_actions import build_schedule_plan
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,25 +109,34 @@ class HosmartQuietHours:
         """Load previous state, register all local-time boundaries, reconcile."""
         stored = await self._store.async_load()
         if isinstance(stored, dict):
-            fields = stored.get("properties")
-            if not isinstance(fields, dict) and stored.get("active"):
-                # v0.2.6 had at most one managed property.
+            values = stored.get("properties")
+            if not isinstance(values, dict) and stored.get("active"):
+                # Migrate v0.2.6 single-property restoration intent.
                 action = stored.get("action")
                 key = "Volume" if action == QUIET_ACTION_MUTE else (
                     "Power" if action == QUIET_ACTION_POWER else ""
                 )
-                fields = {key: stored.get("original")} if key else {}
-            if isinstance(fields, dict):
-                self._managed = {
-                    key: {"original": value}
-                    for key, value in fields.items()
-                    if _valid_original(key, value)
-                }
-                if len(self._managed) != len(fields):
-                    _LOGGER.warning(
-                        "Ho-Smart %s discarded invalid saved quiet-hours data",
-                        self.entry.title,
-                    )
+                values = {key: stored.get("original")} if key else {}
+            if isinstance(values, dict):
+                for key, item in values.items():
+                    value = item.get("original") if isinstance(item, dict) else item
+                    target = (
+                        item.get("target", _target_for(key))
+                        if isinstance(item, dict) else _target_for(key)
+                    ) if key in ("Power", "Volume", *(
+                        f"ZoneAlarming{i}" for i in range(1, 5)
+                    )) else None
+                    if _valid_original(key, value) and (
+                        type(target) in (bool, int, float)
+                    ):
+                        self._managed[key] = {
+                            "original": value,
+                            "target": target,
+                        }
+                    else:
+                        _LOGGER.warning(
+                            "Discarded invalid saved quiet-hours property %s", key
+                        )
 
         self._unsubs.append(self.coordinator.async_add_listener(self._queue))
         self._register_boundaries()
@@ -205,31 +215,26 @@ class HosmartQuietHours:
     async def _save_managed(self) -> None:
         # Store before any command that may disconnect the receiver.
         await self._store.async_save(
-            {"active": bool(self._managed), "properties": {
-                key: item["original"] for key, item in self._managed.items()
-            }}
+            {
+                "active": bool(self._managed),
+                "properties": {
+                    key: {"original": value["original"], "target": value["target"]}
+                    for key, value in self._managed.items()
+                },
+            }
         )
 
-    def _set_status(self, status: str, zones: tuple[int, ...] = ()) -> None:
-        """Expose failed writes as errors instead of a false quiet success."""
-        changed = self.coordinator.quiet_status != status
-        states: dict[int, str] = {}
-        for index in range(1, 5):
-            rule = self.channels.get(str(index), {})
-            protected = isinstance(rule, dict) and rule.get("mode") == "always_active"
-            if index in zones:
-                states[index] = (
-                    status if status in ("error", "unsupported", "waiting_receiver")
-                    else "quiet"
-                )
-            elif protected:
-                states[index] = "protected"
-            else:
-                states[index] = "active"
-        if self.coordinator.channel_quiet_status != states:
-            self.coordinator.channel_quiet_status = states
-            changed = True
+    def _set_status(
+        self, status: str, channels: dict[int, str] | None = None
+    ) -> None:
+        """Expose whether the desired operation actually succeeded."""
+        states = channels or {i: "active" for i in range(1, 5)}
+        changed = (
+            self.coordinator.quiet_status != status
+            or self.coordinator.channel_quiet_status != states
+        )
         self.coordinator.quiet_status = status
+        self.coordinator.channel_quiet_status = states
         if changed:
             self.coordinator.async_update_listeners()
 
@@ -254,7 +259,7 @@ class HosmartQuietHours:
             return False
 
     async def async_reconcile(self) -> None:
-        """Restore obsolete settings first, then apply the current quiet plan."""
+        """Restore unwanted changes, then perform only supported zone actions."""
         async with self._lock:
             if self._stopped:
                 return
@@ -267,87 +272,82 @@ class HosmartQuietHours:
                 self._set_status("unsupported" if configured else "disabled")
                 return
             if not self.coordinator.local_available or not self.coordinator.receiver:
-                self._set_status("waiting_receiver" if (configured or self._managed)
-                                 else "disabled")
+                self._set_status(
+                    "waiting_receiver" if (configured or self._managed) else "disabled"
+                )
                 return
+
             try:
-                global_action, zones = plan_channel_quiet(
+                desired, statuses = build_schedule_plan(
                     dt_util.now(),
-                    receiver_enabled=self.enabled,
-                    receiver_start=self.start,
-                    receiver_end=self.end,
-                    receiver_action=self.action,
+                    enabled=self.enabled,
+                    start=self.start,
+                    end=self.end,
+                    default_action=self.action,
                     channels=self.channels,
                 )
             except (TypeError, ValueError) as err:
-                _LOGGER.error("Invalid Ho-Smart quiet-hours configuration: %s", err)
+                _LOGGER.error("Invalid Ho-Smart schedule: %s", err)
                 self._set_status("error")
                 return
 
-            desired: dict[str, int | bool] = {}
-            if global_action == QUIET_ACTION_MUTE:
-                desired["Volume"] = 0
-            elif global_action == QUIET_ACTION_POWER:
-                desired["Power"] = False
-            else:
-                for index in zones:
-                    desired[f"ZoneAlarming{index}"] = False
+            unsupported = any(
+                state in ("unsupported_tone_mute", "unsupported_global_mute")
+                for state in statuses.values()
+            )
 
-            effective_zones = (1, 2, 3, 4) if global_action else zones
-
-            # Restore prior values that the latest plan no longer targets,
-            # including any saved v0.2.6 global Volume/Power state. Protected
-            # channels take priority: failing to restore global audio is an
-            # error rather than claiming a protected driveway is still audible.
+            # Original state (not the currently scheduled value) must survive
+            # action changes, reloads, and interrupted nights.
             for key in list(self._managed):
                 if key in desired:
                     continue
-                original = self._managed[key]["original"]
+                item = self._managed[key]
                 current = self.coordinator.receiver.get(key)
-                if current is None:
-                    self._set_status("unsupported", effective_zones)
+                if not _valid_original(key, current):
+                    self._set_status("unsupported", statuses)
                     return
-                if current == _target_for(key) and current != original:
+                if current == item["target"] and current != item["original"]:
                     if not await self._write(
-                        key, _normalized_original(key, original)
+                        key, _normalized_original(key, item["original"])
                     ):
-                        self._set_status("error", effective_zones)
+                        self._set_status("error", statuses)
                         return
                 del self._managed[key]
                 await self._save_managed()
 
-            # When a receiver-wide mute/power operation is desired, ensure
-            # all channel rules evaluated quiet before modifying the master.
             for key, target in desired.items():
                 current = self.coordinator.receiver.get(key)
                 if not _valid_original(key, current):
                     _LOGGER.warning(
-                        "Ho-Smart %s does not expose usable %s for scheduling",
+                        "Ho-Smart %s cannot schedule unavailable property %s",
                         self.entry.title, key,
                     )
-                    self._set_status("unsupported", effective_zones)
+                    self._set_status("unsupported", statuses)
                     return
                 if current == target:
+                    if key in self._managed and self._managed[key]["target"] != target:
+                        self._managed[key]["target"] = target
+                        await self._save_managed()
                     continue
+
                 if key not in self._managed:
-                    self._managed[key] = {"original": current}
+                    self._managed[key] = {
+                        "original": current, "target": target
+                    }
                     await self._save_managed()
+                elif self._managed[key]["target"] != target:
+                    self._managed[key]["target"] = target
+                    await self._save_managed()
+
                 if not await self._write(key, target):
-                    self._set_status("error", effective_zones)
+                    self._set_status("error", statuses)
                     return
 
-            if desired:
-                self._set_status(
-                    "quiet" if len(effective_zones) == 4 else "partially_quiet",
-                    effective_zones,
-                )
+            if unsupported:
+                self._set_status("unsupported", statuses)
+            elif desired:
+                self._set_status("scheduled", statuses)
             else:
-                protected = any(
-                    isinstance(rule, dict) and rule.get("mode") == "always_active"
-                    for rule in self.channels.values()
-                )
                 self._set_status(
-                    "protected" if self.enabled and protected else (
-                        "daytime" if configured else "disabled"
-                    )
+                    "daytime" if configured else "disabled", statuses
                 )
