@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to Ho-Smart / eMACROS / eMACROS receiver",
+        "title": "Connect to Ho-Smart / eMACROS receiver",
         "description": "Enter the receiver address and your My Hosmart app credentials. Home Assistant uses the account during setup to retrieve the receiver's local-control key and cloud identity. Your My Hosmart email and password are not saved.",
         "data": {
           "host": "Receiver IP address",
@@ -14,14 +14,14 @@
       }
     },
     "error": {
-      "cannot_connect": "Could not connect to the Ho-Smart / eMACROS / eMACROS receiver on the local network.",
+      "cannot_connect": "Could not connect to the Ho-Smart / eMACROS receiver on the local network.",
       "invalid_cloud_auth": "The My Hosmart email or password was not accepted.",
       "cloud_error": "Could not communicate with the My Hosmart service.",
       "no_devices": "The My Hosmart account did not return any receivers.",
       "cannot_match_device": "The account devices could not be matched to this receiver. Verify the receiver IP address."
     },
     "abort": {
-      "already_configured": "This Ho-Smart / eMACROS / eMACROS receiver is already configured."
+      "already_configured": "This Ho-Smart / eMACROS receiver is already configured."
     }
   },
   "options": {
