@@ -21,6 +21,7 @@ CONF_USER_ID = "user_id"
 CONF_NODE_ID = "node_id"
 CONF_MODE = "connection_mode"
 CONF_CHANNEL_NAMES = "channel_names"
+CONF_RELEASE_CHANNEL = "release_channel"
 
 CONF_QUIET_ENABLED = "quiet_enabled"
 CONF_QUIET_START = "quiet_start"
@@ -52,4 +53,5 @@ PLATFORMS = [
     Platform.SWITCH,
     Platform.SELECT,
     Platform.TIME,
+    Platform.BUTTON,
 ]

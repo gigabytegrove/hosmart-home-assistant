@@ -13,6 +13,7 @@ from .const import (
     CHANNEL_CUSTOM,
     CHANNEL_INHERIT,
     CONF_QUIET_ACTION,
+    CONF_RELEASE_CHANNEL,
     DEFAULT_QUIET_ACTION,
     DOMAIN,
     QUIET_ACTION_MUTE,
@@ -21,6 +22,7 @@ from .const import (
 from .coordinator import HosmartCoordinator
 from .entity import HosmartEntity
 from .settings import async_set_quiet_setting, get_channel_setting
+from .release_install import CHANNELS, RELEASE_CHANNEL_MAIN
 
 
 RECEIVER_ACTIONS = {
@@ -39,12 +41,13 @@ async def async_setup_entry(
 ) -> None:
     """Show action and all channel modes on the device's configuration section."""
     coordinator: HosmartCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    if not coordinator.local_enabled:
-        return
-    async_add_entities(
-        [HosmartQuietSelect(coordinator, None)]
-        + [HosmartQuietSelect(coordinator, channel) for channel in range(1, 5)]
-    )
+    entities: list[SelectEntity] = [HosmartSoftwareChannel(coordinator)]
+    if coordinator.local_enabled:
+        entities.extend(
+            [HosmartQuietSelect(coordinator, None)]
+            + [HosmartQuietSelect(coordinator, channel) for channel in range(1, 5)]
+        )
+    async_add_entities(entities)
 
 
 class HosmartQuietSelect(HosmartEntity, SelectEntity):
@@ -82,4 +85,33 @@ class HosmartQuietSelect(HosmartEntity, SelectEntity):
             value=self._choices[option],
             channel=self._channel,
         )
+        self.async_write_ha_state()
+
+
+class HosmartSoftwareChannel(HosmartEntity, SelectEntity):
+    """Persist the requested HACS installation channel; no automatic install."""
+
+    _attr_name = "Software channel"
+    _attr_icon = "mdi:source-branch"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_options = ["Main (stable)", "Dev (beta)"]
+    _choices = {"Main (stable)": "main", "Dev (beta)": "dev"}
+
+    def __init__(self, coordinator: HosmartCoordinator) -> None:
+        super().__init__(coordinator, "software_channel")
+
+    @property
+    def current_option(self) -> str:
+        channel = self.coordinator.entry.options.get(
+            CONF_RELEASE_CHANNEL, RELEASE_CHANNEL_MAIN
+        )
+        return "Dev (beta)" if channel == "dev" else "Main (stable)"
+
+    async def async_select_option(self, option: str) -> None:
+        if option not in self._choices:
+            raise ValueError("Unknown software channel")
+        entry = self.coordinator.entry
+        updated = {**entry.options, CONF_RELEASE_CHANNEL: self._choices[option]}
+        if updated != dict(entry.options):
+            self.hass.config_entries.async_update_entry(entry, options=updated)
         self.async_write_ha_state()
