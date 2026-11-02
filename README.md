@@ -181,6 +181,50 @@ To enable Hybrid mode:
 
 The credentials are used to connect the existing receiver entry to the correct Ho-Smart account and are then discarded.
 
+## Nighttime quiet hours (development branch — not in v0.2.5)
+
+This feature is being implemented on `feature/nighttime-receiver-quiet-hours`.
+It is **not part of the published v0.2.5 release** and should not be
+considered verified on the HS006W until actual power/volume writes are tested.
+
+For each configured receiver:
+
+1. Open **Settings → Devices & services → Ho-Smart → Configure**.
+2. Keep **Local only** or **Hybrid** selected.
+3. Turn on **Enable nightly quiet hours for this receiver**.
+4. Set the start and end (default **10:00 PM–7:00 AM**, in the timezone
+   configured for Home Assistant).
+5. Choose **Mute audio** or **Power off**. Configure other receivers
+   separately; receivers with quiet hours disabled are unaffected.
+6. Check the per-receiver diagnostic **Night quiet status** sensor:
+   `disabled`, `daytime`, `quiet`, `waiting_receiver`, `unsupported`,
+   or `error`.
+
+**Mute audio** sets Volume to 0 and restores its pre-night value. This is the
+preferred setting because network and cloud alarm reporting can continue.
+
+**Power off** sets the receiver's Power field to false and restores its
+previous state at the end of the window. **Caution:** on hardware where
+powering off also shuts down Wi-Fi/local control, Home Assistant may be unable
+to power the receiver back on in the morning. Test while physically present
+before depending on this option. Automatic restoration cannot overcome
+hardware that is no longer remotely reachable.
+
+For each receiver, original state is saved before attempting the command,
+and persists through Home Assistant restarts and integration reloads.
+State changes are read back for confirmation. Failures are logged and retried
+with bounded backoff instead of writing every poll. If a value was already
+off/muted before the schedule, it will not be unnecessarily turned on later.
+A manual change during the quiet period may be reasserted by the schedule.
+Cloud-only mode cannot run these local controls; disable quiet hours and
+allow restoration before switching the receiver to Cloud-only mode.
+
+**Hardware qualification requirement:** The ESP Local Control protocol
+supports property writes, but the vendor-specific HS006W `params`
+write semantics have not been validated with real hardware in this branch.
+If the firmware rejects the command, the status becomes `error` and its
+existing read-only monitoring and cloud alarm ingestion remain available.
+
 ## Privacy and security
 
 The integration stores the receiver information required for local communication.

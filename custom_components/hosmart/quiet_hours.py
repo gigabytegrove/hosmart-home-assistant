@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime
 import logging
+import time
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -58,6 +59,8 @@ class HosmartQuietHours:
         self._task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
         self._stopped = False
+        self._failure_count = 0
+        self._retry_after = 0.0
 
     @property
     def enabled(self) -> bool:
@@ -114,6 +117,8 @@ class HosmartQuietHours:
                 pass
 
     def _on_boundary(self, _now: datetime) -> None:
+        # Transitions, especially morning restoration, bypass stale retry delay.
+        self._retry_after = 0.0
         self._queue_reconcile()
 
     def _queue_reconcile(self) -> None:
@@ -129,15 +134,30 @@ class HosmartQuietHours:
         await self._store.async_save(state or {"active": False})
         self._state = state
 
+    def _set_status(self, status: str) -> None:
+        if self.coordinator.quiet_status != status:
+            self.coordinator.quiet_status = status
+            self.coordinator.async_update_listeners()
+
     async def _write(self, key: str, value: int | float | bool) -> bool:
+        # Unsupported firmware must not be hammered with writes every 3-5s.
+        if time.monotonic() < self._retry_after:
+            return False
         try:
             await self.coordinator.async_set_receiver_parameter(key, value)
+            self._failure_count = 0
+            self._retry_after = 0.0
             return True
         except Exception as err:
+            self._failure_count += 1
+            self._retry_after = time.monotonic() + min(
+                900, 15 * 2 ** min(self._failure_count - 1, 6)
+            )
             _LOGGER.warning(
                 "Ho-Smart %s quiet hours could not set %s: %s",
                 self.entry.title, key, err,
             )
+            self._set_status("error")
             return False
 
     async def _restore(self, receiver: dict[str, Any]) -> bool:
@@ -156,14 +176,19 @@ class HosmartQuietHours:
     async def async_reconcile(self) -> None:
         """Apply a transition and retry failures when local polling resumes."""
         async with self._lock:
-            if self._stopped or not self.coordinator.local_enabled:
+            if self._stopped:
+                return
+            if not self.coordinator.local_enabled:
+                self._set_status("disabled")
                 return
             # A cached snapshot must never be used to issue commands if local
             # connectivity has failed since it was captured.
             if not self.coordinator.local_available:
+                self._set_status("waiting_receiver" if self.enabled else "disabled")
                 return
             receiver = self.coordinator.receiver
             if not receiver:
+                self._set_status("waiting_receiver" if self.enabled else "disabled")
                 return
             try:
                 in_window = self.enabled and is_quiet_now(
@@ -182,10 +207,12 @@ class HosmartQuietHours:
                 receiver = self.coordinator.receiver
 
             if requested_action is None:
+                self._set_status("daytime" if self.enabled else "disabled")
                 return
             key, target = _PARAMETERS.get(requested_action, (None, None))
             if key is None:
                 _LOGGER.error("Unknown quiet-hours action %s", requested_action)
+                self._set_status("error")
                 return
             current = receiver.get(key)
             if type(current) not in (bool, int, float):
@@ -193,6 +220,7 @@ class HosmartQuietHours:
                     "Ho-Smart %s has no readable %s control; quiet hours not applied",
                     self.entry.title, key,
                 )
+                self._set_status("unsupported")
                 return
 
             if self._state is None:
@@ -201,4 +229,7 @@ class HosmartQuietHours:
                 )
 
             if current != target:
-                await self._write(key, target)
+                if not await self._write(key, target):
+                    self._set_status("error")
+                    return
+            self._set_status("quiet")

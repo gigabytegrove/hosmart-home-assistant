@@ -278,7 +278,10 @@ class HosmartOptionsFlow(OptionsFlow):
             enabled = user_input[CONF_QUIET_ENABLED]
             start = user_input[CONF_QUIET_START]
             end = user_input[CONF_QUIET_END]
-            if enabled and mode == MODE_CLOUD:
+            if mode == MODE_CLOUD and (
+                enabled or self.config_entry.options.get(CONF_QUIET_ENABLED, False)
+            ):
+                # Disable and restore in Local/Hybrid first, then change mode.
                 errors["base"] = "quiet_requires_local"
             else:
                 try:
