@@ -29,44 +29,32 @@ RELEASE_API = f"https://api.github.com/repos/{REPOSITORY}/releases?per_page=30"
 
 
 def find_hacs_update_entity(hass: Any) -> str:
-    """Locate the HACS-managed update entity, never an unrelated updater."""
+    """Find exactly this repository's update entity in HACS or Marketplace.
+
+    Both providers use the GitHub repository ID for update entity unique_id.
+    No fuzzy matching by name/title; other projects must never be updated.
+    """
     registry = er.async_get(hass)
-    matches: list[str] = []
-    for item in registry.entities.values():
-        if item.domain != "update" or item.platform != "hacs":
+    for platform in ("marketplace", "hacs"):
+        entity_id = registry.async_get_entity_id(
+            "update", platform, "1393997438"
+        )
+        if entity_id is None:
             continue
-        state = hass.states.get(item.entity_id)
+        state = hass.states.get(entity_id)
         if state is None:
             continue
-        properties = state.attributes
-        title = str(properties.get("title") or "")
-        name = str(properties.get("friendly_name") or "")
-        release_url = str(properties.get("release_url") or "")
-        unique = str(item.unique_id or "")
-        if (
-            REPOSITORY in release_url
-            or REPOSITORY in unique
-            or ("Ho-Smart" in title and "eMACROS" in title)
-            or ("Ho-Smart" in name and "eMACROS" in name)
-            or ("Ho-Smart" in title and "Home Assistant" in title)
-        ):
-            matches.append(item.entity_id)
-    if len(matches) != 1:
-        raise HomeAssistantError(
-            "Cannot identify the HACS update entity for Ho-Smart & eMACROS. "
-            "Use HACS > Ho-Smart & eMACROS > Redownload > "
-            "Need a different version to select a stable or beta release."
-        )
-    entity_id = matches[0]
-    state = hass.states.get(entity_id)
-    features = int(state.attributes.get("supported_features", 0))
-    if not features & int(UpdateEntityFeature.INSTALL_SPECIFIC_VERSION):
-        raise HomeAssistantError(
-            "The installed HACS update entity does not support selecting "
-            "a specific release version. Use HACS > Redownload instead."
-        )
-    return entity_id
-
+        features = int(state.attributes.get("supported_features", 0))
+        if not features & int(UpdateEntityFeature.SPECIFIC_VERSION):
+            raise HomeAssistantError(
+                "The Marketplace update entity does not support specific "
+                "versions. Update the Marketplace/HACS before retrying."
+            )
+        return entity_id
+    raise HomeAssistantError(
+        "The Ho-Smart & eMACROS HACS/Marketplace update entity is unavailable. "
+        "Verify that the repository is installed and its update entity is enabled."
+    )
 
 async def async_latest_published_tag(hass: Any, channel: str) -> str:
     """Read the authenticated-by-TLS public GitHub release index."""
