@@ -36,36 +36,65 @@ For the HS006W, the receiver exposes normal status locally but does not expose d
 
 ## Current release
 
-**Current integration version: v0.2.9-dev.3**
+**Current integration version: v0.2.9-dev.4**
 
-**Development preview:** v0.2.9-dev.3 is an opt-in prerelease from `dev`. Production remains [v0.2.8](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.8) on `main`. This version hides Action/Start/End when a channel's schedule is Off or inherited, and hides the Default schedule fields when Default is disabled on Home Assistant Core 2026.11 or newer. Your previously saved schedule values are kept.
+**Development preview:** v0.2.9-dev.4 adds **persistent Main / Development update-channel selection during initial receiver setup and Configure**. This selection now manages the *actual HACS/Marketplace Pre-release switch*, so future published development releases can appear in ordinary update checks. Stable `main` remains [v0.2.8](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.8). The integration does not silently install upgrades.
 
-## Main and dev installation channels
+## Main and Development update channels
 
-| Track | GitHub branch | HACS installer selection | Intended use |
-| --- | --- | --- | --- |
-| **Main (stable)** | `main` | Latest normal GitHub release, currently v0.2.8 | Everyday use |
-| **Dev (beta)** | `dev` | Latest published `vX.Y.Z-dev.N` GitHub prerelease | Explicit opt-in testing |
+**Choose once, keep receiving updates on that channel.** During initial
+**Settings → Devices & services → Add integration → Ho-Smart & eMACROS**
+setup, choose **Update channel**. For an existing installed receiver,
+open **Ho-Smart & eMACROS → Configure** and change **Update channel**.
 
-You can select **Software channel** on the receiver device page and press
-**Install selected channel** to request the chosen *published release* through
-Home Assistant's `update.install` service. The operation locates the
-Ho-Smart HACS update entity and asks HACS to install the exact version.
-**It does not directly edit files and never silently updates just because
-you change the selector.** If the matching HACS updater cannot be identified,
-or it does not support specific-version installs, the button reports an
-actionable error instead of claiming that an installation succeeded.
+| Choice | Receives in normal HACS/Marketplace update checks | Code source |
+| --- | --- | --- |
+| **Main — stable releases** | Published non-prerelease GitHub versions | `main` branch |
+| **Development — nightly prereleases** | Published `-dev.N` GitHub prereleases, as they become available | `dev` branch |
 
-The supported manual fallback is always **HACS → Ho-Smart & eMACROS →
-Redownload → Need a different version? → select Release**, and choose the
-stable or `-dev.N` prerelease. HACS may require showing beta versions
-before they appear. Restart Home Assistant after download.
+The selection persists across Home Assistant restarts. When you select
+Development, Ho-Smart enables **this repository's HACS/Marketplace
+Pre-release switch**; Main turns it off. This is the same switch HACS
+uses to decide which releases appear in its normal update entity.
+If it is disabled or not yet created, the integration automatically
+enables it and retries synchronization every minute until the provider
+has loaded. **Update channel status** under the receiver's Diagnostics
+reports `main_tracking`, `dev_tracking`, or a pending/error status.
+The switch applies to the whole Ho-Smart integration, not independently
+to each receiver; changing it in one receiver's settings updates all
+configured Ho-Smart receivers.
 
-The `hosmart` domain, existing entry IDs, receiver pairings, schedule data,
-and unique entity IDs are identical on both tracks; you cannot load both
-builds concurrently under the same domain. The `dev` release is **not**
-automatically promoted to `main`: it must pass validation and be merged.
-For development status, see the [dev branch](https://github.com/gigabytegrove/hosmart-home-assistant/tree/dev).
+**No recurring Redownload procedure is required.** After choosing your
+channel, future versions appear through **Settings → Updates** or HACS/
+Marketplace update entities on the provider's refresh schedule. You
+still decide when to press Install; switching channels does not
+silently download, overwrite files, or restart Home Assistant.
+
+The companion device-page **Update channel** selector follows the same
+stored preference. The optional **Install selected channel** button can
+request the most recently published stable or dev version immediately
+using the provider's `update.install` action when available, for example
+when switching back from an existing dev build to an older stable build.
+The button is *not required* for routine future updates.
+
+**One-time bootstrap for existing v0.2.8 users:** v0.2.8 predates
+this integration-to-HACS synchronization feature. Install
+**v0.2.9-dev.4** once using the repository version picker, restart, then
+choose **Development** in Configure. Afterward the channel is persistent.
+Users who first install a build containing this feature can select it
+during initial integration setup without a second configuration step.
+
+HACS/Marketplace checks for new releases periodically. Custom GitHub
+repositories may take up to **48 hours** to refresh metadata unless
+repository information is refreshed manually. A new commit to `dev`
+is not itself an update: the nightly-style publisher must first publish
+a versioned GitHub prerelease. Development versions are opt-in and may
+contain unverified behavior.
+
+The installation domain remains `hosmart`, regardless of channel.
+Existing credentials, paired receivers, entity IDs, and quiet-hour data
+are preserved. You cannot run `main` and `dev` concurrently in one
+Home Assistant instance.
 
 ## Conditional schedule fields
 

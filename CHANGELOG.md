@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.9-dev.4
+
+**Purpose:** Make Main/Development an actual persistent HACS/Marketplace update-discovery choice, selected during initial setup or Configure, rather than a decorative in-integration preference.
+
+- Add Main/Development release-channel selection to the first-time receiver setup flow and existing Configure flow, saved in config-entry options.
+- Synchronize the selection with the exact HACS/Marketplace **Pre-release switch**, identified using Ho-Smart's verified GitHub repository ID. Main disables prerelease discovery; Development enables it.
+- Enable the provider's disabled-by-default switch when necessary and retry synchronization after startup while HACS/Marketplace is loading.
+- Share one release-channel preference across all Ho-Smart receivers in the same Home Assistant instance and surface a diagnostic **Update channel status** sensor.
+- Preserve HACS's normal update/Install workflow: no recurring manual Redownload and no forced installation or restart when selecting a channel.
+- Fix the optional specific-version install action to recognize both legacy HACS and built-in Marketplace update entities, using supported Home Assistant update-entity feature flags.
+- Add regression tests covering repository identity, missing/disabled switches, channel changes, idempotency, and multi-receiver consistency.
+
+**Limitations:** HACS/Marketplace determines its own metadata-refresh cadence; channel selection makes a published prerelease eligible for future update checks, but does not trigger instant refresh or automatically install it. The live user's HACS instance and HS006W hardware writes remain unverified.
+
+See [v0.2.9-dev.4 release notes](.github/release-notes/v0.2.9-dev.4.md).
+
+
 ## 0.2.9-dev.3
 
 **Purpose:** Prevent accidental edits to inactive channel schedules by hiding irrelevant controls and retaining saved schedules.

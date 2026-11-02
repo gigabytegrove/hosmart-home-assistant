@@ -3,13 +3,14 @@
     "step": {
       "user": {
         "title": "Connect to Ho-Smart / eMACROS receiver",
-        "description": "Enter the receiver address and your My Hosmart app credentials. Home Assistant uses the account during setup to retrieve the receiver's local-control key and cloud identity. Your My Hosmart email and password are not saved.",
+        "description": "Enter the receiver address and your My Hosmart app credentials. Home Assistant uses the account during setup to retrieve the receiver's local-control key and cloud identity. Your My Hosmart email and password are not saved. Choose Main for stable updates or Development to receive nightly-style prerelease update notifications after setup.",
         "data": {
           "host": "Receiver IP address",
           "port": "Local control port",
           "connection_mode": "Connection mode",
           "username": "My Hosmart account email",
-          "password": "My Hosmart account password"
+          "password": "My Hosmart account password",
+          "release_channel": "Update channel"
         }
       }
     },
@@ -28,9 +29,10 @@
     "step": {
       "init": {
         "title": "Receiver schedule",
-        "description": "One save configures Default and Ch. 1–4. Expand a channel only when it needs an override. Arm/disarm changes zone detection; tone-only muting is not supported by the verified HS006W receiver. Old master-volume/power schedules are retained.",
+        "description": "One save configures Default and Ch. 1–4. Expand a channel only when it needs an override. Arm/disarm changes zone detection; tone-only muting is not supported by the verified HS006W receiver. Old master-volume/power schedules are retained. Update channel selects Main (stable) or Development (nightly-style prereleases) for the whole integration. Ho-Smart synchronizes the Marketplace/HACS prerelease switch so future updates appear in Settings → Updates; changing it does not install updates automatically.",
         "data": {
-          "connection_mode": "Connection mode"
+          "connection_mode": "Connection mode",
+          "release_channel": "Update channel"
         },
         "sections": {
           "default": {
