@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.8
+
+**Purpose:** Fix the unintuitive quiet-hours setup flow: channel schedules should be normal, visible device controls, not successive Configure forms.
+
+- Replace the receiver/channel multi-step options flow with native Home Assistant switch, select and time entities on every local/hybrid receiver's device page.
+- Add always-visible controls for the receiver-wide enable switch, main start/end, and receiver action, plus independent behavior/start/end for Channels 1–4.
+- Add direct Channel 1–4 arm/disarm switches using the verified-readback local command path; arm/disarm can affect event reporting, not just sound.
+- Preserve v0.2.6/v0.2.7 config-entry options and restore intent without requiring re-pairing or data migration.
+- Apply setting edits and reschedule time triggers in place without reloading or reconnecting the receiver. Keep Configure for connection mode/credentials only.
+- Add regression tests for independent channel edits, default windows, invalid times, Cloud-only restrictions and avoiding redundant writes.
+- Keep Ho-Smart and eMACROS dual-brand names; release documentation warns that physical write behavior remains unverified.
+
+See [v0.2.8 release notes](.github/release-notes/v0.2.8.md) for the controls, hardware limitations and upgrade instructions.
+
+
 ## 0.2.7
 
 - Add per-channel inherit, always-active and custom start/end quiet-hours settings.
