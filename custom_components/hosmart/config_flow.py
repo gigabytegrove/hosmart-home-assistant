@@ -6,7 +6,13 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant import config_entries
+try:
+    import probatio as pvol
+except ImportError:
+    # Core before 2026.11 lacks conditional form-field support.
+    pvol = vol
+
+from homeassistant import config_entries, data_entry_flow
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 from homeassistant.core import callback
@@ -274,6 +280,26 @@ class HosmartOptionsFlow(OptionsFlow):
     _pending_options: dict[str, Any] | None = None
 
     @staticmethod
+    def _conditional_field(
+        name: str,
+        default: Any,
+        *,
+        depends_on: str,
+        value: Any,
+    ) -> Any:
+        """Hide and disable irrelevant fields on Home Assistant 2026.11+.
+
+        Older HA versions have no conditional field API, so their forms
+        retain visible fields for backwards compatibility.
+        """
+        required = getattr(data_entry_flow, "Required", None)
+        if required is None:
+            return vol.Required(name, default=default)
+        return required(
+            name, default=default, visible={"field": depends_on, "value": value}
+        )
+
+    @staticmethod
     def _mode_selector() -> selector.SelectSelector:
         return selector.SelectSelector(
             selector.SelectSelectorConfig(
@@ -341,9 +367,21 @@ class HosmartOptionsFlow(OptionsFlow):
                     options.update(
                         {
                             CONF_QUIET_ENABLED: default["enabled"],
-                            CONF_QUIET_ACTION: default["action"],
-                            CONF_QUIET_START: default["start"],
-                            CONF_QUIET_END: default["end"],
+                            CONF_QUIET_ACTION: default.get(
+                                "action", options.get(
+                                    CONF_QUIET_ACTION, DEFAULT_QUIET_ACTION
+                                )
+                            ),
+                            CONF_QUIET_START: default.get(
+                                "start", options.get(
+                                    CONF_QUIET_START, DEFAULT_QUIET_START
+                                )
+                            ),
+                            CONF_QUIET_END: default.get(
+                                "end", options.get(
+                                    CONF_QUIET_END, DEFAULT_QUIET_END
+                                )
+                            ),
                         }
                     )
                     rules = options.get(CONF_CHANNEL_QUIET, {})
@@ -355,9 +393,23 @@ class HosmartOptionsFlow(OptionsFlow):
                         values = provided[f"ch{index}"]
                         if not isinstance(values, dict):
                             raise ValueError("Invalid channel section")
+                        saved = rules.get(str(index), {})
+                        if not isinstance(saved, dict):
+                            saved = {}
                         rules[str(index)] = {
-                            field: values[field]
-                            for field in ("mode", "action", "start", "end")
+                            "mode": values["mode"],
+                            "action": values.get(
+                                "action", saved.get("action", "disarm")
+                            ),
+                            "start": values.get(
+                                "start", saved.get(
+                                    "start", DEFAULT_QUIET_START
+                                )
+                            ),
+                            "end": values.get(
+                                "end", saved.get("end", DEFAULT_QUIET_END
+                                )
+                            ),
                         }
                     options[CONF_CHANNEL_QUIET] = rules
                     selected_mode = provided[CONF_MODE]
@@ -392,7 +444,7 @@ class HosmartOptionsFlow(OptionsFlow):
                 return self.async_create_entry(data=options)
 
         default_saved = self._section_data("default", provided)
-        default_schema = vol.Schema(
+        default_schema = pvol.Schema(
             {
                 vol.Required(
                     "enabled",
@@ -400,29 +452,35 @@ class HosmartOptionsFlow(OptionsFlow):
                         "enabled", old.get(CONF_QUIET_ENABLED, False)
                     ),
                 ): selector.BooleanSelector(),
-                vol.Required(
+                self._conditional_field(
                     "action",
-                    default=default_saved.get(
+                    default_saved.get(
                         "action", old.get(CONF_QUIET_ACTION, DEFAULT_QUIET_ACTION)
                     ),
+                    depends_on="enabled",
+                    value=True,
                 ): self._action_selector(default=True),
-                vol.Required(
+                self._conditional_field(
                     "start",
-                    default=default_saved.get(
+                    default_saved.get(
                         "start", old.get(CONF_QUIET_START, DEFAULT_QUIET_START)
                     ),
+                    depends_on="enabled",
+                    value=True,
                 ): selector.TimeSelector(),
-                vol.Required(
+                self._conditional_field(
                     "end",
-                    default=default_saved.get(
+                    default_saved.get(
                         "end", old.get(CONF_QUIET_END, DEFAULT_QUIET_END)
                     ),
+                    depends_on="enabled",
+                    value=True,
                 ): selector.TimeSelector(),
             }
         )
 
         fields: dict[Any, Any] = {
-            vol.Required("default"): section(
+            pvol.Required("default"): section(
                 default_schema, {"collapsed": False}
             ),
         }
@@ -435,7 +493,7 @@ class HosmartOptionsFlow(OptionsFlow):
             saved = rules.get(str(index), {})
             if not isinstance(saved, dict):
                 saved = {}
-            schema = vol.Schema(
+            schema = pvol.Schema(
                 {
                     vol.Required(
                         "mode",
@@ -451,7 +509,7 @@ class HosmartOptionsFlow(OptionsFlow):
                                 },
                                 {
                                     "value": CHANNEL_ALWAYS_ACTIVE,
-                                    "label": "Always armed (exclude from schedule)",
+                                    "label": "Off (no schedule; keep current zone state)",
                                 },
                                 {
                                     "value": CHANNEL_CUSTOM,
@@ -461,36 +519,42 @@ class HosmartOptionsFlow(OptionsFlow):
                             mode=selector.SelectSelectorMode.DROPDOWN,
                         )
                     ),
-                    vol.Required(
+                    self._conditional_field(
                         "action",
-                        default=submitted.get(
+                        submitted.get(
                             "action", saved.get("action", "disarm")
                         ),
+                        depends_on="mode",
+                        value=CHANNEL_CUSTOM,
                     ): self._action_selector(default=False),
-                    vol.Required(
+                    self._conditional_field(
                         "start",
-                        default=submitted.get(
+                        submitted.get(
                             "start", saved.get("start", DEFAULT_QUIET_START)
                         ),
+                        depends_on="mode",
+                        value=CHANNEL_CUSTOM,
                     ): selector.TimeSelector(),
-                    vol.Required(
+                    self._conditional_field(
                         "end",
-                        default=submitted.get(
+                        submitted.get(
                             "end", saved.get("end", DEFAULT_QUIET_END)
                         ),
+                        depends_on="mode",
+                        value=CHANNEL_CUSTOM,
                     ): selector.TimeSelector(),
                 }
             )
-            fields[vol.Required(name)] = section(
+            fields[pvol.Required(name)] = section(
                 schema, {"collapsed": True}
             )
 
-        fields[vol.Required(
+        fields[pvol.Required(
             CONF_MODE, default=provided.get(CONF_MODE, current_mode)
         )] = self._mode_selector()
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(fields),
+            data_schema=pvol.Schema(fields),
             errors=errors,
         )
 
