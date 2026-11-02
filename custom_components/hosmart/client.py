@@ -445,3 +445,65 @@ class HosmartClient:
                 if isinstance(retry_err, HosmartError):
                     raise
                 raise HosmartConnectionError(str(retry_err)) from retry_err
+
+    @staticmethod
+    def _set_values_request(index: int, data: bytes) -> bytes:
+        """Encode ESP LocalCtrl TypeCmdSetPropertyValues (6)."""
+        prop = _field_varint(1, index) + _field_bytes(2, data)
+        command = _field_bytes(1, prop)
+        return _field_varint(1, 6) + _field_bytes(14, command)
+
+    @staticmethod
+    def _parse_set_values_response(data: bytes) -> None:
+        """Require an explicit protobuf success, not only HTTP success."""
+        outer = _parse_fields(data)
+        if _int_value(outer, 1, -1) != 7:
+            raise HosmartError("Unexpected local-control write response type")
+        payload = _bytes_value(outer, 15)
+        if payload is None:
+            raise HosmartError("Local-control write response missing")
+        if _int_value(_parse_fields(payload), 1, -1) != 0:
+            raise HosmartError("Receiver rejected the local-control write")
+
+    def write_receiver_parameter(
+        self,
+        key: str,
+        value: int | float | bool,
+    ) -> dict[str, Any]:
+        """Set an allowed receiver property and verify its observed value.
+
+        Only the named Receiver field is sent. This avoids overwriting
+        unrelated zone/alarm values with a stale whole-device snapshot.
+        """
+        if key not in ("Power", "Volume"):
+            raise ValueError("Only Power and Volume receiver controls are supported")
+        if key == "Power" and type(value) is not bool:
+            raise ValueError("Power must be a boolean")
+        if key == "Volume" and (
+            type(value) not in (int, float) or not 0 <= value <= 100
+        ):
+            raise ValueError("Volume must be between 0 and 100")
+
+        snapshot = self.read_snapshot()
+        receiver = (snapshot.get("params") or {}).get("Receiver") or {}
+        if key not in receiver:
+            raise HosmartError(f"Receiver does not expose {key}")
+        if "params" not in self._property_indexes:
+            raise HosmartError("Receiver has no params property")
+
+        # The HS006W exposes params as a JSON property. Whether a particular
+        # firmware accepts writes must be confirmed on actual hardware.
+        body = json.dumps(
+            {"Receiver": {key: value}}, separators=(",", ":")
+        ).encode("utf-8")
+        command = self._set_values_request(self._property_indexes["params"], body)
+        reply = self._crypt(
+            self._post("/esp_local_ctrl/control", self._crypt(command))
+        )
+        self._parse_set_values_response(reply)
+
+        verified = self.read_snapshot()
+        observed = ((verified.get("params") or {}).get("Receiver") or {}).get(key)
+        if observed != value:
+            raise HosmartError(f"Receiver did not confirm requested {key} value")
+        return verified

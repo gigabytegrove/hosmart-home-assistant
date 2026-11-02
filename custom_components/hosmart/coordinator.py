@@ -95,6 +95,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self.entry = entry
         self.client = client
+        self._local_client_lock = asyncio.Lock()
         self.recorder = recorder
         self._history_client = (
             HosmartHistoryClient(async_get_clientsession(hass))
@@ -103,6 +104,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self.local_available = not self.local_enabled
         self.cloud_available = not self.cloud_enabled
+        self.quiet_status = "disabled"
 
         self.poll_count = 0
         self.change_count = 0
@@ -196,6 +198,20 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._alarm_expiry_handle.cancel()
             self._alarm_expiry_handle = None
         self._alarm_pulse_until = 0.0
+
+    async def async_set_receiver_parameter(
+        self, key: str, value: int | float | bool
+    ) -> None:
+        """Serialize writes with polls to protect the Security1 cipher state."""
+        if not self.local_enabled or self.client is None:
+            raise HosmartError("Receiver local control is not configured")
+        async with self._local_client_lock:
+            snapshot = await self.hass.async_add_executor_job(
+                self.client.write_receiver_parameter, key, value
+            )
+        self.local_available = True
+        self._local_snapshot = snapshot
+        self.async_set_updated_data(snapshot)
 
     def request_local_refresh(self) -> None:
         """Force the next coordinator cycle to include a local read."""
@@ -423,31 +439,32 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         started = time.monotonic()
         started_at = dt_util.utcnow()
 
-        try:
+        async with self._local_client_lock:
             try:
-                snapshot = await self.hass.async_add_executor_job(self.client.read_snapshot)
-            except HosmartConnectionError:
-                # The Security1 client reconnects once already; retry one
-                # additional time for transient Wi-Fi/TCP transport failures.
-                self.local_retry_count += 1
-                await asyncio.sleep(0.3)
-                snapshot = await self.hass.async_add_executor_job(self.client.read_snapshot)
-        except Exception as err:
-            elapsed_ms = round((time.monotonic() - started) * 1000, 3)
-            self.local_available = False
-            await self.recorder.async_record(
-                "poll_error",
-                poll=poll_number,
-                started_at=started_at,
-                duration_ms=elapsed_ms,
-                error_type=type(err).__name__,
-                error=str(err),
-            )
-            if self._local_snapshot is None and not self.cloud_enabled:
-                if isinstance(err, HosmartError):
-                    raise UpdateFailed(str(err)) from err
-                raise UpdateFailed(f"Local receiver read failed: {err}") from err
-            return
+                try:
+                    snapshot = await self.hass.async_add_executor_job(self.client.read_snapshot)
+                except HosmartConnectionError:
+                    # The Security1 client reconnects once already; retry one
+                    # additional time for transient Wi-Fi/TCP transport failures.
+                    self.local_retry_count += 1
+                    await asyncio.sleep(0.3)
+                    snapshot = await self.hass.async_add_executor_job(self.client.read_snapshot)
+            except Exception as err:
+                elapsed_ms = round((time.monotonic() - started) * 1000, 3)
+                self.local_available = False
+                await self.recorder.async_record(
+                    "poll_error",
+                    poll=poll_number,
+                    started_at=started_at,
+                    duration_ms=elapsed_ms,
+                    error_type=type(err).__name__,
+                    error=str(err),
+                )
+                if self._local_snapshot is None and not self.cloud_enabled:
+                    if isinstance(err, HosmartError):
+                        raise UpdateFailed(str(err)) from err
+                    raise UpdateFailed(f"Local receiver read failed: {err}") from err
+                return
 
         elapsed_ms = round((time.monotonic() - started) * 1000, 3)
         await self._async_process_local_snapshot(

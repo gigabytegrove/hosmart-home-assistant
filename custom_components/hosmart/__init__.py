@@ -23,6 +23,7 @@ from .const import (
 )
 from .coordinator import HosmartCoordinator, async_start_udp_listener
 from .debug import HosmartDebugRecorder
+from .quiet_hours import HosmartQuietHours
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,6 +99,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    quiet = HosmartQuietHours(hass, entry, coordinator)
+    hass.data[DOMAIN][entry.entry_id]["quiet"] = quiet
+    await quiet.async_start()
     return True
 
 
@@ -113,6 +117,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         transport.close()
 
     coordinator: HosmartCoordinator = runtime["coordinator"]
+    quiet: HosmartQuietHours | None = runtime.get("quiet")
+    if quiet is not None:
+        await quiet.async_stop()
     coordinator.cancel_alarm_timer()
     recorder: HosmartDebugRecorder = runtime["recorder"]
     await recorder.async_record(

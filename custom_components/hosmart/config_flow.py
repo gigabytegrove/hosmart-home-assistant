@@ -23,9 +23,19 @@ from .cloud import (
     HosmartCloudError,
     get_account_setup,
 )
+from .night_schedule import parse_time
 from .const import (
     CONF_CHANNEL_NAMES,
     CONF_MODE,
+    CONF_QUIET_ENABLED,
+    CONF_QUIET_START,
+    CONF_QUIET_END,
+    CONF_QUIET_ACTION,
+    DEFAULT_QUIET_ACTION,
+    DEFAULT_QUIET_START,
+    DEFAULT_QUIET_END,
+    QUIET_ACTION_MUTE,
+    QUIET_ACTION_POWER,
     CONF_NODE_ID,
     CONF_POP,
     CONF_USER_ID,
@@ -253,6 +263,7 @@ class HosmartOptionsFlow(OptionsFlow):
     """Configure Local / Cloud / Hybrid runtime behavior."""
 
     _pending_mode: str | None = None
+    _pending_options: dict[str, Any] | None = None
 
     async def async_step_init(self, user_input=None) -> ConfigFlowResult:
         """Choose the runtime mode."""
@@ -261,34 +272,100 @@ class HosmartOptionsFlow(OptionsFlow):
             MODE_LOCAL if CONF_USER_ID not in self.config_entry.data else DEFAULT_MODE,
         )
 
+        errors: dict[str, str] = {}
         if user_input is not None:
             mode = user_input[CONF_MODE]
-
-            if mode in (MODE_CLOUD, MODE_HYBRID) and not self.config_entry.data.get(
-                CONF_USER_ID
+            enabled = user_input[CONF_QUIET_ENABLED]
+            start = user_input[CONF_QUIET_START]
+            end = user_input[CONF_QUIET_END]
+            if mode == MODE_CLOUD and (
+                enabled or self.config_entry.options.get(CONF_QUIET_ENABLED, False)
             ):
-                self._pending_mode = mode
-                return await self.async_step_cloud_credentials()
+                # Disable and restore in Local/Hybrid first, then change mode.
+                errors["base"] = "quiet_requires_local"
+            else:
+                try:
+                    if parse_time(start) == parse_time(end):
+                        errors["base"] = "quiet_times_equal"
+                except (ValueError, TypeError):
+                    errors["base"] = "quiet_times_invalid"
 
-            return self.async_create_entry(
-                data={
+            if not errors:
+                options = {
                     **self.config_entry.options,
                     CONF_MODE: mode,
+                    CONF_QUIET_ENABLED: enabled,
+                    CONF_QUIET_START: start,
+                    CONF_QUIET_END: end,
+                    CONF_QUIET_ACTION: user_input[CONF_QUIET_ACTION],
                 }
-            )
+                if mode in (MODE_CLOUD, MODE_HYBRID) and not self.config_entry.data.get(
+                    CONF_USER_ID
+                ):
+                    self._pending_mode = mode
+                    self._pending_options = options
+                    return await self.async_step_cloud_credentials()
+                return self.async_create_entry(data=options)
 
+        options = self.config_entry.options
+        submitted = user_input or {}
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_MODE, default=current): selector.SelectSelector(
+                    vol.Required(
+                        CONF_MODE, default=submitted.get(CONF_MODE, current)
+                    ): selector.SelectSelector(
                         selector.SelectSelectorConfig(
                             options=MODE_OPTIONS,
                             mode=selector.SelectSelectorMode.DROPDOWN,
                         )
-                    )
+                    ),
+                    vol.Required(
+                        CONF_QUIET_ENABLED,
+                        default=submitted.get(
+                            CONF_QUIET_ENABLED,
+                            options.get(CONF_QUIET_ENABLED, False),
+                        ),
+                    ): selector.BooleanSelector(),
+                    vol.Required(
+                        CONF_QUIET_START,
+                        default=submitted.get(
+                            CONF_QUIET_START,
+                            options.get(CONF_QUIET_START, DEFAULT_QUIET_START),
+                        ),
+                    ): selector.TimeSelector(),
+                    vol.Required(
+                        CONF_QUIET_END,
+                        default=submitted.get(
+                            CONF_QUIET_END,
+                            options.get(CONF_QUIET_END, DEFAULT_QUIET_END),
+                        ),
+                    ): selector.TimeSelector(),
+                    vol.Required(
+                        CONF_QUIET_ACTION,
+                        default=submitted.get(
+                            CONF_QUIET_ACTION,
+                            options.get(CONF_QUIET_ACTION, DEFAULT_QUIET_ACTION),
+                        ),
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[
+                                {
+                                    "value": QUIET_ACTION_MUTE,
+                                    "label": "Mute audio (restore previous volume)",
+                                },
+                                {
+                                    "value": QUIET_ACTION_POWER,
+                                    "label": "Power off (restore previous power state)",
+                                },
+                            ],
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
                 }
             ),
+            errors=errors,
         )
 
     async def async_step_cloud_credentials(
@@ -339,7 +416,7 @@ class HosmartOptionsFlow(OptionsFlow):
                     )
 
                     return self.async_create_entry(
-                        data={
+                        data=self._pending_options or {
                             **self.config_entry.options,
                             CONF_MODE: self._pending_mode or DEFAULT_MODE,
                         }

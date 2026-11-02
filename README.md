@@ -24,6 +24,7 @@ Ho-Smart for Home Assistant can provide:
 - Driveway alarm activity
 - Receiver power state
 - Volume
+- Optional per-receiver nighttime quiet hours (experimental receiver writes; disabled by default)
 - Internal battery level
 - Channel and zone information
 - Zone 1–4 armed states
@@ -35,9 +36,9 @@ For the HS006W, the receiver exposes normal status locally but does not expose d
 
 ## Current release
 
-**Current integration version: v0.2.5**
+**Current integration version: v0.2.6**
 
-See the [latest published GitHub Release](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest) for installation and upgrade information and the [v0.2.5 release notes](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.5) for this version's changes and limitations. v0.2.5 addresses intermittent cloud communication failures and alarm-history recovery; it cannot report driveway alarms that never reach Ho-Smart's cloud history.
+See the [latest published GitHub Release](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest) for installation and upgrade information and the [v0.2.6 release notes](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.6) for this version's changes, cautions, and limits. v0.2.6 introduces configurable overnight quiet hours per receiver. Receiver Power/Volume writes are experimental until validated on HS006W hardware; the existing local monitoring and cloud-alarm transport remain unchanged.
 
 ## Installation with HACS
 
@@ -180,6 +181,50 @@ To enable Hybrid mode:
 4. Enter your My Hosmart email and password when prompted.
 
 The credentials are used to connect the existing receiver entry to the correct Ho-Smart account and are then discarded.
+
+## Nighttime quiet hours (v0.2.6)
+
+The schedules and options are available in v0.2.6. **Receiver write control
+has not been hardware-qualified on HS006W firmware 2.0**; users should confirm
+operation on their own receiver before relying on it unattended.
+
+For each configured receiver:
+
+1. Open **Settings → Devices & services → Ho-Smart → Configure**.
+2. Keep **Local only** or **Hybrid** selected.
+3. Turn on **Enable nightly quiet hours for this receiver**.
+4. Set the start and end (default **10:00 PM–7:00 AM**, in the timezone
+   configured for Home Assistant).
+5. Choose **Mute audio** or **Power off**. Configure other receivers
+   separately; receivers with quiet hours disabled are unaffected.
+6. Check the per-receiver diagnostic **Night quiet status** sensor:
+   `disabled`, `daytime`, `quiet`, `waiting_receiver`, `unsupported`,
+   or `error`.
+
+**Mute audio** sets Volume to 0 and restores its pre-night value. This is the
+preferred setting because network and cloud alarm reporting can continue.
+
+**Power off** sets the receiver's Power field to false and restores its
+previous state at the end of the window. **Caution:** on hardware where
+powering off also shuts down Wi-Fi/local control, Home Assistant may be unable
+to power the receiver back on in the morning. Test while physically present
+before depending on this option. Automatic restoration cannot overcome
+hardware that is no longer remotely reachable.
+
+For each receiver, original state is saved before attempting the command,
+and persists through Home Assistant restarts and integration reloads.
+State changes are read back for confirmation. Failures are logged and retried
+with bounded backoff instead of writing every poll. If a value was already
+off/muted before the schedule, it will not be unnecessarily turned on later.
+A manual change during the quiet period may be reasserted by the schedule.
+Cloud-only mode cannot run these local controls; disable quiet hours and
+allow restoration before switching the receiver to Cloud-only mode.
+
+**Hardware qualification requirement:** The ESP Local Control protocol
+supports property writes, but the vendor-specific HS006W `params`
+write semantics have not been validated with real hardware in this release.
+If the firmware rejects the command, the status becomes `error` and its
+existing read-only monitoring and cloud alarm ingestion remain available.
 
 ## Privacy and security
 

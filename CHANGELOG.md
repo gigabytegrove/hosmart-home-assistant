@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.6
+
+**Purpose:** Introduce per-receiver automated overnight quiet hours without disturbing proven cloud alarm history and local-monitoring behavior. Receiver write commands remain unverified on physical HS006W hardware; use this release's control feature cautiously.
+
+- Add independent per-receiver enablement, configurable quiet-hours start/end, and mute or power-off choice (default 10:00 PM–7:00 AM, off until enabled).
+- Restore the last observed volume/power state after the schedule ends; keep restoration intent in Home Assistant persistent storage across restarts.
+- Serialize local receiver reads and writes through the existing authenticated Security1 session, require a positive protocol acknowledgement and readback, and back off failed writes.
+- Add a Night quiet status diagnostic sensor for schedule state and communication errors.
+- Continue Hybrid cloud alarm polling without pausing during quiet hours; retain the existing v0.2.5 reliability protections.
+- Include unit tests for same-day, cross-midnight, and boundary scheduling and surface exact setup/risks in documentation.
+
+**Limitations:** ESP Local Control supports property-write messages, but the receiver-specific firmware's JSON property-write semantics have not been validated on physical HS006W hardware. A hardware power-off might also disable Wi-Fi, blocking remote wake-up. Prefer volume mute; the feature is disabled by default. No hardware write success or automatic wakeup is claimed without field testing.
+
+See [detailed v0.2.6 release notes](.github/release-notes/v0.2.6.md).
+
+
 ## 0.2.5
 
 **Purpose:** Reduce missed Home Assistant driveway-alarm notifications caused by intermittent Ho-Smart cloud DNS/TLS/HTTPS failures, delayed history delivery, and transient local receiver connection errors. This is a reliability and recovery release, **not** a new feature release. It cannot reconstruct physical alarms that the manufacturer never records.

@@ -46,6 +46,13 @@ def _udp_time_value(coordinator: HosmartCoordinator) -> str:
 
 SENSORS = (
     HosmartSensorDescription(
+        key="night_quiet_status",
+        name="Night quiet status",
+        icon="mdi:weather-night",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda c: c.quiet_status,
+    ),
+    HosmartSensorDescription(
         key="event",
         name="Event",
         icon="mdi:motion-sensor",
