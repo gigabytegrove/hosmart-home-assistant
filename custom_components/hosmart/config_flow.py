@@ -446,7 +446,7 @@ class HosmartOptionsFlow(OptionsFlow):
         default_saved = self._section_data("default", provided)
         default_schema = pvol.Schema(
             {
-                vol.Required(
+                pvol.Required(
                     "enabled",
                     default=default_saved.get(
                         "enabled", old.get(CONF_QUIET_ENABLED, False)
@@ -495,7 +495,7 @@ class HosmartOptionsFlow(OptionsFlow):
                 saved = {}
             schema = pvol.Schema(
                 {
-                    vol.Required(
+                    pvol.Required(
                         "mode",
                         default=submitted.get(
                             "mode", saved.get("mode", CHANNEL_INHERIT)
