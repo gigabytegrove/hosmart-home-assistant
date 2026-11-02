@@ -1,4 +1,4 @@
-"""Sensors for Ho-Smart receivers."""
+"""Sensors for Ho-Smart / eMACROS receivers."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from .entity import HosmartEntity
 
 @dataclass(frozen=True, kw_only=True)
 class HosmartSensorDescription(SensorEntityDescription):
-    """Describe a Ho-Smart sensor."""
+    """Describe a Ho-Smart / eMACROS sensor."""
 
     value_fn: Callable[[HosmartCoordinator], Any]
     requires_local: bool = False
@@ -246,7 +246,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Ho-Smart sensors."""
+    """Set up Ho-Smart / eMACROS sensors."""
     coordinator: HosmartCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     async_add_entities(
         HosmartSensor(coordinator, description)
@@ -256,7 +256,7 @@ async def async_setup_entry(
 
 
 class HosmartSensor(HosmartEntity, SensorEntity):
-    """A Ho-Smart sensor."""
+    """A Ho-Smart / eMACROS sensor."""
 
     entity_description: HosmartSensorDescription
 

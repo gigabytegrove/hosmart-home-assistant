@@ -1,4 +1,4 @@
-"""Diagnostics support for Ho-Smart."""
+"""Diagnostics support for Ho-Smart / eMACROS."""
 
 from __future__ import annotations
 

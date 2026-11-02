@@ -1,4 +1,4 @@
-"""Binary sensors for Ho-Smart receivers."""
+"""Binary sensors for Ho-Smart / eMACROS receivers."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from .entity import HosmartEntity
 
 @dataclass(frozen=True, kw_only=True)
 class HosmartBinaryDescription(BinarySensorEntityDescription):
-    """Describe a Ho-Smart binary sensor."""
+    """Describe a Ho-Smart / eMACROS binary sensor."""
 
     value_fn: Callable[[HosmartCoordinator], bool | None]
     requires_local: bool = False
@@ -119,7 +119,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Ho-Smart binary sensors."""
+    """Set up Ho-Smart / eMACROS binary sensors."""
     coordinator: HosmartCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     async_add_entities(
         HosmartBinarySensor(coordinator, description)
@@ -130,7 +130,7 @@ async def async_setup_entry(
 
 
 class HosmartBinarySensor(HosmartEntity, BinarySensorEntity):
-    """A Ho-Smart binary sensor."""
+    """A Ho-Smart / eMACROS binary sensor."""
 
     entity_description: HosmartBinaryDescription
 

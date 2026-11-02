@@ -1,4 +1,4 @@
-"""Ho-Smart Home Assistant integration."""
+"""Ho-Smart / eMACROS Home Assistant integration."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Ho-Smart from a config entry."""
+    """Set up Ho-Smart / eMACROS from a config entry."""
     mode = _mode(entry)
     local_enabled = mode in (MODE_LOCAL, MODE_HYBRID)
 
@@ -62,7 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         if not pop or not host or not port:
             _LOGGER.error(
-                "Ho-Smart %s requires local host/port/POP but config data is incomplete",
+                "Ho-Smart / eMACROS %s requires local host/port/POP but config data is incomplete",
                 mode,
             )
             return False
@@ -106,7 +106,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a Ho-Smart config entry."""
+    """Unload a Ho-Smart / eMACROS config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unloaded:
         return False

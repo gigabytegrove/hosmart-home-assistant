@@ -1,4 +1,4 @@
-"""Config flow for Ho-Smart."""
+"""Config flow for Ho-Smart / eMACROS."""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ def _channel_names(receiver: dict[str, Any]) -> dict[str, str]:
 
 
 class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Ho-Smart."""
+    """Handle a config flow for Ho-Smart / eMACROS."""
 
     VERSION = 1
 
@@ -121,7 +121,7 @@ class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         raise HosmartAuthenticationError(
-            "No Ho-Smart account device matched this local receiver"
+            "No Ho-Smart / eMACROS account device matched this local receiver"
         )
 
     async def async_step_user(self, user_input=None) -> ConfigFlowResult:
@@ -185,7 +185,7 @@ class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     title = (
                         receiver.get("Name")
                         or candidate.get("name")
-                        or "Ho-Smart"
+                        or "Ho-Smart / eMACROS"
                     )
 
                     if node_id:
