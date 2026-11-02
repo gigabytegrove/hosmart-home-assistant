@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Channel quiet hours and dual-brand recognition
+## 0.2.7
 
 - Add per-channel inherit, always-active and custom start/end quiet-hours settings.
 - Preserve active/protected channels by avoiding receiver-wide mute/power-off.

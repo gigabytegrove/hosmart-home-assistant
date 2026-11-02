@@ -8,7 +8,7 @@ body:
       value: |
         Feature ideas and device support requests are welcome.
 
-        For new receiver support, please provide the exact model and firmware. Similar-looking Ho-Smart, Hosmart, or eMACROS devices may use different behavior internally.
+        For new receiver support, please provide the exact model and firmware. Similar-looking Ho-Smart or eMACROS devices may use different behavior internally.
 
   - type: textarea
     id: problem

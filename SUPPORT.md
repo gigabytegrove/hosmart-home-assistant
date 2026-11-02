@@ -1,6 +1,6 @@
 # Support
 
-Need help with Ho-Smart for Home Assistant? GitHub Issues is the best place to report a reproducible problem or request support for another device.
+Need help with Ho-Smart & eMACROS for Home Assistant? GitHub Issues is the best place to report a reproducible problem or request support for another device.
 
 ## Before opening an issue
 
@@ -18,7 +18,7 @@ For the verified HS006W, **Hybrid mode** is recommended because receiver status 
 
 For a bug report, include:
 
-- Ho-Smart integration version
+- Ho-Smart / eMACROS integration version
 - Home Assistant version
 - Receiver model
 - Receiver firmware version
@@ -32,7 +32,7 @@ The more exact the information, the easier the problem is to reproduce.
 
 ## Device support requests
 
-If your Ho-Smart, Hosmart, or eMACROS receiver is not currently verified, include:
+If your Ho-Smart or eMACROS receiver is not currently verified, include:
 
 - Exact model number
 - Firmware version

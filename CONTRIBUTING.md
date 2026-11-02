@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are welcome, especially fixes, documentation improvements, and support for additional Ho-Smart-compatible receivers.
+Contributions are welcome, especially fixes, documentation improvements, and support for additional Ho-Smart / eMACROS-compatible receivers.
 
 ## Keep changes focused
 
@@ -10,7 +10,7 @@ Previously verified HS006W behavior should be preserved unless the change specif
 
 ## Device support
 
-Do not assume two Ho-Smart, Hosmart, or eMACROS models use the same behavior just because they look similar.
+Do not assume two Ho-Smart or eMACROS models use the same behavior just because they look similar.
 
 For device-specific changes, include:
 
