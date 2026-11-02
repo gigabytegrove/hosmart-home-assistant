@@ -7,7 +7,6 @@ installer, and the user must press the explicit install button.
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any
 
 from homeassistant.components.update import UpdateEntityFeature
@@ -17,45 +16,15 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 _LOGGER = logging.getLogger(__name__)
 
+from .release_versions import (
+    CHANNELS,
+    RELEASE_CHANNEL_DEV,
+    RELEASE_CHANNEL_MAIN,
+    latest_tag_for_channel,
+)
+
 REPOSITORY = "gigabytegrove/hosmart-home-assistant"
 RELEASE_API = f"https://api.github.com/repos/{REPOSITORY}/releases?per_page=30"
-RELEASE_CHANNEL_MAIN = "main"
-RELEASE_CHANNEL_DEV = "dev"
-CHANNELS = (RELEASE_CHANNEL_MAIN, RELEASE_CHANNEL_DEV)
-
-_STABLE_RE = re.compile(r"^v\d+\.\d+\.\d+$")
-_DEV_RE = re.compile(r"^v\d+\.\d+\.\d+-dev\.\d+$")
-
-
-def latest_tag_for_channel(releases: Any, channel: str) -> str:
-    """Find an actual published, non-draft release for the selected channel.
-
-    The source is GitHub's list sorted by release publication date, not a
-    guessed tag name or a direct install of an unvalidated branch tip.
-    """
-    if channel not in CHANNELS:
-        raise ValueError("Unknown Ho-Smart software channel")
-    if not isinstance(releases, list):
-        raise ValueError("Invalid GitHub release response")
-    for release in releases:
-        if not isinstance(release, dict) or release.get("draft"):
-            continue
-        tag = release.get("tag_name")
-        if not isinstance(tag, str):
-            continue
-        is_preview = bool(release.get("prerelease"))
-        if channel == RELEASE_CHANNEL_MAIN and (
-            not is_preview and _STABLE_RE.fullmatch(tag)
-        ):
-            return tag
-        if channel == RELEASE_CHANNEL_DEV and (
-            is_preview and _DEV_RE.fullmatch(tag)
-        ):
-            return tag
-    raise ValueError(
-        "No published stable release" if channel == RELEASE_CHANNEL_MAIN
-        else "No published dev prerelease; select Main until a beta is available"
-    )
 
 
 def find_hacs_update_entity(hass: Any) -> str:
