@@ -287,21 +287,20 @@ class HosmartOptionsFlow(OptionsFlow):
         options = [
             {"value": "disarm", "label": "Disarm zone during window"},
             {"value": "arm", "label": "Arm zone during window"},
-            {
-                "value": "mute_tone",
-                "label": "Mute only that tone (unsupported on verified HS006W)",
-            },
+        # A physical channel-tone mute is not a verified HS006W capability.
+        # Do not offer a nonfunctional choice that could be mistaken for
+        # an active zone disarm or real receiver audio suppression.
         ]
         if default:
             options.extend(
                 [
                     {
                         "value": "mute",
-                        "label": "Mute ENTIRE receiver (legacy)",
+                        "label": "Mute ALL receiver audio (legacy)",
                     },
                     {
                         "value": "power_off",
-                        "label": "Power off ENTIRE receiver (legacy)",
+                        "label": "Power off ALL channels (legacy)",
                     },
                 ]
             )

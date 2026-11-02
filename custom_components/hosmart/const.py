@@ -34,7 +34,7 @@ CHANNEL_CUSTOM = "custom"
 CHANNEL_MODES = (CHANNEL_INHERIT, CHANNEL_ALWAYS_ACTIVE, CHANNEL_CUSTOM)
 QUIET_ACTION_MUTE = "mute"
 QUIET_ACTION_POWER = "power_off"
-DEFAULT_QUIET_ACTION = QUIET_ACTION_MUTE
+DEFAULT_QUIET_ACTION = "disarm"
 # Preserve explicit v0.2.6/v0.2.8 mute options; new user-supplied
 # schedules can choose per-zone arming without changing old behavior.
 QUIET_ACTION_ARM = "arm"

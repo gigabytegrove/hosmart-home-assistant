@@ -27,10 +27,22 @@
   "options": {
     "step": {
       "init": {
-        "title": "Connection mode",
-        "description": "Choose how this receiver connects to Home Assistant. Nighttime quiet hours, individual channel schedules, and arm/disarm switches are on the receiver's device page under Configuration; you do not need Configure for everyday settings.",
+        "title": "Receiver schedule",
+        "description": "One save configures Default and Ch. 1–4. Expand a channel only when it needs an override. Arm/disarm changes zone detection; tone-only muting is not supported by the verified HS006W receiver. Old master-volume/power schedules are retained.",
         "data": {
+          "enabled": "Default",
+          "action": "Action",
+          "start": "Start",
+          "end": "End",
+          "mode": "Schedule",
           "connection_mode": "Connection mode"
+        },
+        "sections": {
+          "default": "Default",
+          "ch1": "Ch. 1",
+          "ch2": "Ch. 2",
+          "ch3": "Ch. 3",
+          "ch4": "Ch. 4"
         }
       },
       "cloud_credentials": {
@@ -46,7 +58,8 @@
       "invalid_cloud_auth": "The My Hosmart email or password was not accepted.",
       "cloud_error": "Could not communicate with the My Hosmart service.",
       "cannot_match_device": "This My Hosmart account does not contain the receiver already configured in Home Assistant.",
-      "quiet_requires_local": "Quiet hours require Local or Hybrid mode to communicate with this receiver."
+      "quiet_requires_local": "Quiet hours require Local or Hybrid mode to communicate with this receiver.",
+      "invalid_schedule": "Invalid schedule: verify the times and actions; start/end must differ. Cloud-only mode cannot apply local schedules."
     }
   }
 }
