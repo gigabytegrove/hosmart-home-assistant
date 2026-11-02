@@ -138,6 +138,23 @@ class OptionsTests(unittest.TestCase):
             result["channel_quiet"]["2"], self.existing["channel_quiet"]["2"]
         )
 
+    def test_rename_channel_action_is_independent(self):
+        result = S.updated_quiet_options(
+            self.existing, key="action", value="arm", channel=2
+        )
+        self.assertEqual(result["channel_quiet"]["2"]["action"], "arm")
+        self.assertEqual(
+            result["channel_quiet"]["1"],
+            self.existing["channel_quiet"]["1"],
+        )
+
+    def test_disarm_action_cannot_be_replaced_by_invalid_mute(self):
+        with self.assertRaises(ValueError):
+            S.updated_quiet_options(
+                self.existing, key="action", value="mute_all_while_armed",
+                channel=2,
+            )
+
     def test_custom_start_cannot_equal_end(self):
         with self.assertRaisesRegex(ValueError, "Channel 2"):
             S.updated_quiet_options(

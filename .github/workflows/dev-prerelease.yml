@@ -27,6 +27,7 @@ jobs:
           python -m unittest discover -s tests -p test_channel_quiet.py
           python -m unittest discover -s tests -p test_quiet_settings.py
           python -m unittest discover -s tests -p test_release_versions.py
+          python -m unittest discover -s tests -p test_schedule_actions.py
           python -m unittest discover -s tests -p test_release_documentation.py
 
       - name: Verify versioned release documentation and notes
