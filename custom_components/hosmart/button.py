@@ -28,7 +28,7 @@ async def async_setup_entry(
 class HosmartInstallSelectedChannel(HosmartEntity, ButtonEntity):
     """User-initiated install via HACS, never direct filesystem manipulation."""
 
-    _attr_name = "91 Install selected channel"
+    _attr_name = "Install selected channel"
     _attr_icon = "mdi:download"
     _attr_entity_category = EntityCategory.CONFIG
 
