@@ -336,24 +336,31 @@ class HosmartOptionsFlow(OptionsFlow):
                 errors["base"] = "invalid_schedule"
             else:
                 try:
-                    for option, key in (
-                        ("enabled", CONF_QUIET_ENABLED),
-                        ("action", CONF_QUIET_ACTION),
-                        ("start", CONF_QUIET_START),
-                        ("end", CONF_QUIET_END),
-                    ):
-                        options = updated_quiet_options(
-                            options, key=key, value=default[option]
-                        )
+                    # Build all fields first. Validating each time picker
+                    # separately would reject a legal Start/End pair if one
+                    # intermediate value happened to equal the previous end.
+                    options.update(
+                        {
+                            CONF_QUIET_ENABLED: default["enabled"],
+                            CONF_QUIET_ACTION: default["action"],
+                            CONF_QUIET_START: default["start"],
+                            CONF_QUIET_END: default["end"],
+                        }
+                    )
+                    rules = options.get(CONF_CHANNEL_QUIET, {})
+                    rules = {
+                        key: dict(value) for key, value in rules.items()
+                        if isinstance(key, str) and isinstance(value, dict)
+                    } if isinstance(rules, dict) else {}
                     for index in range(1, 5):
                         values = provided[f"ch{index}"]
                         if not isinstance(values, dict):
                             raise ValueError("Invalid channel section")
-                        for field in ("mode", "action", "start", "end"):
-                            options = updated_quiet_options(
-                                options, channel=index, key=field,
-                                value=values[field],
-                            )
+                        rules[str(index)] = {
+                            field: values[field]
+                            for field in ("mode", "action", "start", "end")
+                        }
+                    options[CONF_CHANNEL_QUIET] = rules
                     selected_mode = provided[CONF_MODE]
                     options[CONF_MODE] = selected_mode
                     # Check mode after merging all fields; a Cloud-only
