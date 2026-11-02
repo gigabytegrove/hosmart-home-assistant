@@ -55,7 +55,7 @@ from .const import (
     MODE_LOCAL,
 )
 from .night_schedule import parse_time
-from .settings import updated_quiet_options
+from .settings import merge_schedule_section, updated_quiet_options
 
 
 MODE_OPTIONS = [
@@ -364,24 +364,27 @@ class HosmartOptionsFlow(OptionsFlow):
                     # Build all fields first. Validating each time picker
                     # separately would reject a legal Start/End pair if one
                     # intermediate value happened to equal the previous end.
+                    merged_default = merge_schedule_section(
+                        {
+                            "enabled": options.get(CONF_QUIET_ENABLED, False),
+                            "action": options.get(
+                                CONF_QUIET_ACTION, DEFAULT_QUIET_ACTION
+                            ),
+                            "start": options.get(
+                                CONF_QUIET_START, DEFAULT_QUIET_START
+                            ),
+                            "end": options.get(
+                                CONF_QUIET_END, DEFAULT_QUIET_END
+                            ),
+                        },
+                        default,
+                    )
                     options.update(
                         {
-                            CONF_QUIET_ENABLED: default["enabled"],
-                            CONF_QUIET_ACTION: default.get(
-                                "action", options.get(
-                                    CONF_QUIET_ACTION, DEFAULT_QUIET_ACTION
-                                )
-                            ),
-                            CONF_QUIET_START: default.get(
-                                "start", options.get(
-                                    CONF_QUIET_START, DEFAULT_QUIET_START
-                                )
-                            ),
-                            CONF_QUIET_END: default.get(
-                                "end", options.get(
-                                    CONF_QUIET_END, DEFAULT_QUIET_END
-                                )
-                            ),
+                            CONF_QUIET_ENABLED: merged_default["enabled"],
+                            CONF_QUIET_ACTION: merged_default["action"],
+                            CONF_QUIET_START: merged_default["start"],
+                            CONF_QUIET_END: merged_default["end"],
                         }
                     )
                     rules = options.get(CONF_CHANNEL_QUIET, {})
@@ -391,26 +394,10 @@ class HosmartOptionsFlow(OptionsFlow):
                     } if isinstance(rules, dict) else {}
                     for index in range(1, 5):
                         values = provided[f"ch{index}"]
-                        if not isinstance(values, dict):
-                            raise ValueError("Invalid channel section")
                         saved = rules.get(str(index), {})
-                        if not isinstance(saved, dict):
-                            saved = {}
-                        rules[str(index)] = {
-                            "mode": values["mode"],
-                            "action": values.get(
-                                "action", saved.get("action", "disarm")
-                            ),
-                            "start": values.get(
-                                "start", saved.get(
-                                    "start", DEFAULT_QUIET_START
-                                )
-                            ),
-                            "end": values.get(
-                                "end", saved.get("end", DEFAULT_QUIET_END
-                                )
-                            ),
-                        }
+                        rules[str(index)] = merge_schedule_section(
+                            saved, values, channel=index
+                        )
                     options[CONF_CHANNEL_QUIET] = rules
                     selected_mode = provided[CONF_MODE]
                     options[CONF_MODE] = selected_mode
