@@ -36,9 +36,9 @@ For the HS006W, the receiver exposes normal status locally but does not expose d
 
 ## Current release
 
-**Current integration version: v0.2.9-dev.4**
+**Current integration version: v0.2.9-dev.5**
 
-**Development preview:** v0.2.9-dev.4 adds **persistent Main / Development update-channel selection during initial receiver setup and Configure**. This selection now manages the *actual HACS/Marketplace Pre-release switch*, so future published development releases can appear in ordinary update checks. Stable `main` remains [v0.2.8](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.8). The integration does not silently install upgrades.
+**Development preview:** v0.2.9-dev.5 removes the accidental numeric prefixes from legacy schedule labels and detaches those obsolete flat controls from the receiver device page. **Default** and **Ch. 1–4** remain available in one grouped Configure form. Existing schedules and entity IDs are preserved. Update-channel selection continues to synchronize with HACS/Marketplace; stable `main` stays at [v0.2.8](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.8).
 
 ## Main and Development update channels
 
@@ -95,6 +95,24 @@ The installation domain remains `hosmart`, regardless of channel.
 Existing credentials, paired receivers, entity IDs, and quiet-hour data
 are preserved. You cannot run `main` and `dev` concurrently in one
 Home Assistant instance.
+
+## v0.2.9-dev.5 — Corrected Configuration display
+
+The numbers in labels such as **01 Main: Action**, **11 Ch1: Start**, and
+**12 Ch1: End** were an earlier attempt to force alphabetical ordering.
+They have no functional meaning and have been removed.
+
+**More importantly:** Home Assistant displayed those obsolete entity controls
+on the receiver's device page even after the integration marked them
+`(Hidden)`. This build detaches the fifteen superseded Time/Select entities
+from the receiver device without deleting their registry entries or changing
+their entity IDs. Existing scripts and automations can still reference them.
+The device page keeps its normal receiver and zone controls; schedules are
+edited once in **Configure → Default / Ch. 1 / Ch. 2 / Ch. 3 / Ch. 4**.
+
+The device-registry migration is safe to rerun after each Home Assistant
+restart and only affects these fifteen known schedule entities belonging to
+the configured receiver. It does not detach other devices or controls.
 
 ## Conditional schedule fields
 
@@ -306,13 +324,16 @@ existing entity IDs, paired credentials and restoration intent. The active
 schedules re-arm without reconnecting the receiver. This is not a repeated
 onboarding or per-channel setup wizard.
 
-The superseded flat time/select entities are hidden once by the integration
-in Home Assistant's entity registry, **not deleted**. Their unique IDs
-remain available to existing automations and can be managed from the entity
-registry; the new grouped editor is the recommended interface. The
-**Default: Enable schedule** switch remains visible on the receiver
-device page for quick toggling. Direct arm/disarm switches remain under
-device controls.
+The superseded flat time/select entities are **detached from the receiver
+device page** instead of merely marked Hidden. Otherwise Home Assistant
+may still list rows like `01 Main: Action (Hidden)` in Configuration.
+They remain registered under their original entity IDs for existing
+automations, so the integration does not delete or recreate them.
+Their names are now plain **Default action**, **Default start/end**,
+**Ch. 1 schedule**, **Ch. 1 start/end**, and similarly for Ch. 2–4.
+The grouped Configure editor is the recommended way to edit schedules.
+The **Default: Enable schedule** switch remains on the receiver page
+for quick toggling, and direct arm/disarm switches remain available.
 
 ### Conditional field visibility
 

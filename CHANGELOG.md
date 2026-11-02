@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.9-dev.5
+
+**Purpose:** Remove confusing numeric prefixes and eliminate obsolete flat schedule controls from the receiver Configuration panel without breaking existing automations.
+
+- Replace old names like `01 Main: Action` and `21 Ch2: Start` with plain `Default action`, `Ch. 2 start` and `Ch. 2 end`.
+- Fix the legacy migration root cause: `hidden_by=integration` did not prevent hidden controls appearing on the receiver device page. Detach the fifteen obsolete schedule Time/Select entities from the receiver device association instead, retaining their registry IDs and automation access.
+- Prevent reattaching legacy schedule entities on reload by returning no device association for the legacy Time/Select classes. Keep new grouped Configure sections, direct zone controls, and update-channel selector intact.
+- Run a safe, idempotent device-association migration for existing installations, with regression tests ensuring only the intended receiver's original legacy entities are affected.
+- Preserve Ho-Smart/eMACROS branding, current schedule values, Main/Development update-channel behavior, and the stable main branch.
+
+See [v0.2.9-dev.5 release notes](.github/release-notes/v0.2.9-dev.5.md).
+
+
 ## 0.2.9-dev.4
 
 **Purpose:** Make Main/Development an actual persistent HACS/Marketplace update-discovery choice, selected during initial setup or Configure, rather than a decorative in-integration preference.
