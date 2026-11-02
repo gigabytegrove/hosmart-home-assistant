@@ -1,4 +1,4 @@
-"""Data coordinator and local notification listener for Ho-Smart."""
+"""Data coordinator and local notification listener for Ho-Smart / eMACROS."""
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ def _dict_changes(
 
 
 class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Coordinate local receiver state and Ho-Smart cloud alarm history."""
+    """Coordinate local receiver state and Ho-Smart / eMACROS cloud alarm history."""
 
     def __init__(
         self,
@@ -85,7 +85,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         super().__init__(
             hass,
             _LOGGER,
-            name=f"Ho-Smart {entry.entry_id}",
+            name=f"Ho-Smart / eMACROS {entry.entry_id}",
             update_interval=timedelta(
                 seconds=(
                     CLOUD_SCAN_INTERVAL if self.cloud_enabled else DEFAULT_SCAN_INTERVAL
@@ -105,6 +105,9 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.local_available = not self.local_enabled
         self.cloud_available = not self.cloud_enabled
         self.quiet_status = "disabled"
+        self.channel_quiet_status: dict[int, str] = {
+            i: "active" for i in range(1, 5)
+        }
 
         self.poll_count = 0
         self.change_count = 0
@@ -530,7 +533,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         saved_source if isinstance(saved_source, str) else None
                     )
         except (OSError, ValueError, TypeError) as err:
-            _LOGGER.warning("Ho-Smart cloud checkpoint recovery failed: %s", err)
+            _LOGGER.warning("Ho-Smart / eMACROS cloud checkpoint recovery failed: %s", err)
 
     async def _async_save_cloud_checkpoint(self, *, force: bool = False) -> None:
         """Save successful cloud reads periodically and after every new notice."""
@@ -563,7 +566,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.recorder.save_cloud_checkpoint_sync, checkpoint
             )
         except OSError as err:
-            _LOGGER.warning("Ho-Smart cloud checkpoint could not be saved: %s", err)
+            _LOGGER.warning("Ho-Smart / eMACROS cloud checkpoint could not be saved: %s", err)
             return
         self._last_cloud_checkpoint_at = now
 
@@ -589,7 +592,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         try:
             if self._history_client is None:
-                raise HosmartCloudError("Ho-Smart history transport is unavailable")
+                raise HosmartCloudError("Ho-Smart / eMACROS history transport is unavailable")
             records = await self._history_client.query_history(
                 str(user_id),
                 int(start.timestamp() * 1000),
@@ -611,7 +614,7 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 reconciled=reconcile,
             )
             _LOGGER.warning(
-                "Ho-Smart cloud history update failed; local state remains usable: %s",
+                "Ho-Smart / eMACROS cloud history update failed; local state remains usable: %s",
                 err,
             )
             if not self.local_enabled and not self._cloud_initialized:
@@ -765,10 +768,10 @@ class HosmartCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return self._local_snapshot
 
         if self.local_enabled and not self.local_available and not self.cloud_enabled:
-            raise UpdateFailed("Ho-Smart local receiver is unavailable")
+            raise UpdateFailed("Ho-Smart / eMACROS local receiver is unavailable")
 
         if self.cloud_enabled and not self.cloud_available and not self.local_enabled:
-            raise UpdateFailed("Ho-Smart cloud alarm history is unavailable")
+            raise UpdateFailed("Ho-Smart / eMACROS cloud alarm history is unavailable")
 
         return {
             "node_id": self.node_id,
@@ -863,7 +866,7 @@ async def async_start_udp_listener(
             error=str(err),
         )
         _LOGGER.warning(
-            "Could not bind Ho-Smart UDP/%s listener (%s); polling remains active",
+            "Could not bind Ho-Smart / eMACROS UDP/%s listener (%s); polling remains active",
             UDP_PORT,
             err,
         )
@@ -874,5 +877,5 @@ async def async_start_udp_listener(
         bind="0.0.0.0",
         port=UDP_PORT,
     )
-    _LOGGER.info("Ho-Smart local notification listener active on UDP/%s", UDP_PORT)
+    _LOGGER.info("Ho-Smart / eMACROS local notification listener active on UDP/%s", UDP_PORT)
     return transport

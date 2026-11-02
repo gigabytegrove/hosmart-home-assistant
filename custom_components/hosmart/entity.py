@@ -1,4 +1,4 @@
-"""Base entity for Ho-Smart."""
+"""Base entity for Ho-Smart / eMACROS."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from .coordinator import HosmartCoordinator
 
 
 class HosmartEntity(CoordinatorEntity[HosmartCoordinator]):
-    """Base Ho-Smart entity."""
+    """Base Ho-Smart / eMACROS entity."""
 
     _attr_has_entity_name = True
 
@@ -28,8 +28,8 @@ class HosmartEntity(CoordinatorEntity[HosmartCoordinator]):
         node_id = self.coordinator.node_id or self.coordinator.entry.entry_id
         return DeviceInfo(
             identifiers={(DOMAIN, str(node_id))},
-            name=receiver.get("Name") or self.coordinator.entry.title or "Ho-Smart Receiver",
-            manufacturer="Ho-Smart",
+            name=receiver.get("Name") or self.coordinator.entry.title or "Ho-Smart / eMACROS Receiver",
+            manufacturer="Ho-Smart / eMACROS",
             model=data.get("model"),
             sw_version=data.get("fw_version"),
         )

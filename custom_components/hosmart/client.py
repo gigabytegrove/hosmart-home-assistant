@@ -474,11 +474,14 @@ class HosmartClient:
 
         Only the named Receiver field is sent. This avoids overwriting
         unrelated zone/alarm values with a stale whole-device snapshot.
+        ZoneArming fields are device ARM/DISARM controls, not audio mute.
+        A disarmed zone may cease reporting cloud alarm events.
         """
-        if key not in ("Power", "Volume"):
-            raise ValueError("Only Power and Volume receiver controls are supported")
-        if key == "Power" and type(value) is not bool:
-            raise ValueError("Power must be a boolean")
+        zone_key = key in tuple(f"ZoneAlarming{i}" for i in range(1, 5))
+        if key not in ("Power", "Volume") and not zone_key:
+            raise ValueError("Unsupported receiver control parameter")
+        if (key == "Power" or zone_key) and type(value) is not bool:
+            raise ValueError("Power and zone arming require booleans")
         if key == "Volume" and (
             type(value) not in (int, float) or not 0 <= value <= 100
         ):

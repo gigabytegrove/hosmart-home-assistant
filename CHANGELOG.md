@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.7
+
+- Add per-channel inherit, always-active and custom start/end quiet-hours settings.
+- Preserve active/protected channels by avoiding receiver-wide mute/power-off.
+- Schedule targeted zone disarming, preserve previous armed values across restarts and restore after the quiet window.
+- Show per-channel status diagnostics, update tests and document device write caveats.
+- Clearly distinguish supported Ho-Smart and eMACROS branding from unverified device models.
+- **Hardware limitation:** Zone disarming may suppress notifications as well as sound; receiver write operations require field qualification.
+
+
 ## 0.2.6
 
 **Purpose:** Introduce per-receiver automated overnight quiet hours without disturbing proven cloud alarm history and local-monitoring behavior. Receiver write commands remain unverified on physical HS006W hardware; use this release's control feature cautiously.

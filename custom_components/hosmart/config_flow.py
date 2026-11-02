@@ -1,4 +1,4 @@
-"""Config flow for Ho-Smart."""
+"""Config flow for Ho-Smart / eMACROS."""
 
 from __future__ import annotations
 
@@ -26,6 +26,10 @@ from .cloud import (
 from .night_schedule import parse_time
 from .const import (
     CONF_CHANNEL_NAMES,
+    CONF_CHANNEL_QUIET,
+    CHANNEL_INHERIT,
+    CHANNEL_ALWAYS_ACTIVE,
+    CHANNEL_CUSTOM,
     CONF_MODE,
     CONF_QUIET_ENABLED,
     CONF_QUIET_START,
@@ -65,7 +69,7 @@ def _channel_names(receiver: dict[str, Any]) -> dict[str, str]:
 
 
 class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Ho-Smart."""
+    """Handle a config flow for Ho-Smart / eMACROS."""
 
     VERSION = 1
 
@@ -117,7 +121,7 @@ class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         raise HosmartAuthenticationError(
-            "No Ho-Smart account device matched this local receiver"
+            "No Ho-Smart / eMACROS account device matched this local receiver"
         )
 
     async def async_step_user(self, user_input=None) -> ConfigFlowResult:
@@ -181,7 +185,7 @@ class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     title = (
                         receiver.get("Name")
                         or candidate.get("name")
-                        or "Ho-Smart"
+                        or "Ho-Smart / eMACROS"
                     )
 
                     if node_id:
@@ -299,13 +303,9 @@ class HosmartOptionsFlow(OptionsFlow):
                     CONF_QUIET_END: end,
                     CONF_QUIET_ACTION: user_input[CONF_QUIET_ACTION],
                 }
-                if mode in (MODE_CLOUD, MODE_HYBRID) and not self.config_entry.data.get(
-                    CONF_USER_ID
-                ):
-                    self._pending_mode = mode
-                    self._pending_options = options
-                    return await self.async_step_cloud_credentials()
-                return self.async_create_entry(data=options)
+                self._pending_mode = mode
+                self._pending_options = options
+                return await self.async_step_channels()
 
         options = self.config_entry.options
         submitted = user_input or {}
@@ -366,6 +366,115 @@ class HosmartOptionsFlow(OptionsFlow):
                 }
             ),
             errors=errors,
+        )
+
+    async def async_step_channels(self, user_input=None) -> ConfigFlowResult:
+        """Configure independent channel policies after receiver-wide settings."""
+        errors: dict[str, str] = {}
+        defaults = self.config_entry.options.get(CONF_CHANNEL_QUIET, {})
+        if not isinstance(defaults, dict):
+            defaults = {}
+        submitted = user_input or {}
+
+        if user_input is not None:
+            configured: dict[str, dict[str, str]] = {}
+            for index in range(1, 5):
+                prefix = f"channel_{index}_"
+                rule = {
+                    "mode": submitted[prefix + "mode"],
+                    "start": submitted[prefix + "start"],
+                    "end": submitted[prefix + "end"],
+                }
+                if rule["mode"] == CHANNEL_CUSTOM:
+                    try:
+                        if parse_time(rule["start"]) == parse_time(rule["end"]):
+                            errors["base"] = "quiet_times_equal"
+                    except (TypeError, ValueError):
+                        errors["base"] = "quiet_times_invalid"
+                configured[str(index)] = rule
+
+            mode = (self._pending_options or {}).get(CONF_MODE)
+            old_custom = any(
+                isinstance(rule, dict) and rule.get("mode") == CHANNEL_CUSTOM
+                for rule in defaults.values()
+            )
+            new_custom = any(
+                rule["mode"] == CHANNEL_CUSTOM for rule in configured.values()
+            )
+            if mode == MODE_CLOUD and (old_custom or new_custom):
+                # Disarm state must be restored before leaving local control.
+                errors["base"] = "quiet_requires_local"
+
+            if not errors:
+                options = {
+                    **(self._pending_options or self.config_entry.options),
+                    CONF_CHANNEL_QUIET: configured,
+                }
+                if mode in (MODE_CLOUD, MODE_HYBRID) and not self.config_entry.data.get(
+                    CONF_USER_ID
+                ):
+                    self._pending_options = options
+                    return await self.async_step_cloud_credentials()
+                return self.async_create_entry(data=options)
+
+        fields: dict[Any, Any] = {}
+        for index in range(1, 5):
+            prefix = f"channel_{index}_"
+            stored = defaults.get(str(index), {})
+            if not isinstance(stored, dict):
+                stored = {}
+            fields[
+                vol.Required(
+                    prefix + "mode",
+                    default=submitted.get(
+                        prefix + "mode", stored.get("mode", CHANNEL_INHERIT)
+                    ),
+                )
+            ] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[
+                        {
+                            "value": CHANNEL_INHERIT,
+                            "label": "Follow receiver-wide schedule",
+                        },
+                        {
+                            "value": CHANNEL_ALWAYS_ACTIVE,
+                            "label": "Always active (protect this channel)",
+                        },
+                        {
+                            "value": CHANNEL_CUSTOM,
+                            "label": "Custom channel quiet hours",
+                        },
+                    ],
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            )
+            for suffix, default_time in (
+                ("start", DEFAULT_QUIET_START),
+                ("end", DEFAULT_QUIET_END),
+            ):
+                fields[
+                    vol.Required(
+                        prefix + suffix,
+                        default=submitted.get(
+                            prefix + suffix,
+                            stored.get(suffix, default_time),
+                        ),
+                    )
+                ] = selector.TimeSelector()
+
+        names = self.config_entry.data.get(CONF_CHANNEL_NAMES) or {}
+        if not isinstance(names, dict):
+            names = {}
+        labels = " · ".join(
+            f"CH{index}: {str(names.get(str(index)) or 'Unnamed')[:50]}"
+            for index in range(1, 5)
+        )
+        return self.async_show_form(
+            step_id="channels",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            description_placeholders={"channel_names": labels},
         )
 
     async def async_step_cloud_credentials(

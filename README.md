@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="logo.png" alt="Ho-Smart for Home Assistant" width="560">
+  <img src="logo.png" alt="Ho-Smart and eMACROS for Home Assistant" width="560">
 </p>
 
-# Ho-Smart for Home Assistant
+# Ho-Smart & eMACROS for Home Assistant
 
 [![GitHub stars](https://img.shields.io/github/stars/gigabytegrove/hosmart-home-assistant?style=flat&label=Stars)](https://github.com/gigabytegrove/hosmart-home-assistant/stargazers)
 [![GitHub repository](https://img.shields.io/badge/GitHub-Repository-181717?logo=github&logoColor=white)](https://github.com/gigabytegrove/hosmart-home-assistant)
@@ -13,13 +13,13 @@
 [![Add to HACS](https://img.shields.io/badge/Add%20to-HACS-41BDF5?logo=homeassistant&logoColor=white)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gigabytegrove&repository=hosmart-home-assistant&category=integration)
 [![Open HACS repository on My Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gigabytegrove&repository=hosmart-home-assistant&category=integration)
 
-Bring supported Ho-Smart driveway alarm receivers into Home Assistant with local receiver status, alarm history, and automation-friendly entities.
+Bring supported **Ho-Smart and eMACROS** driveway alarm receivers into Home Assistant with local receiver status, alarm history, and automation-friendly entities.
 
-The integration is currently verified with the **Ho-Smart HS006W** receiver running firmware **2.0**.
+**Brand compatibility:** Ho-Smart and eMACROS are brands of the same manufacturer, and certain Wi-Fi products share the **My Hosmart** app ecosystem. Hardware is **not universally interchangeable across models**. The verified protocol baseline remains the **HS006W receiver with firmware 2.0**; other branded models require individual testing. See [manufacturer information](https://www.hosmartmall.com/pages/our-story) and [compatibility guidance](https://myhosmart.com/technical-support-2/).
 
 ## What it does
 
-Ho-Smart for Home Assistant can provide:
+Ho-Smart & eMACROS for Home Assistant can provide:
 
 - Driveway alarm activity
 - Receiver power state
@@ -36,9 +36,9 @@ For the HS006W, the receiver exposes normal status locally but does not expose d
 
 ## Current release
 
-**Current integration version: v0.2.6**
+**Current integration version: v0.2.7**
 
-See the [latest published GitHub Release](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest) for installation and upgrade information and the [v0.2.6 release notes](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.6) for this version's changes, cautions, and limits. v0.2.6 introduces configurable overnight quiet hours per receiver. Receiver Power/Volume writes are experimental until validated on HS006W hardware; the existing local monitoring and cloud-alarm transport remain unchanged.
+See the [latest GitHub release](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest) and [v0.2.7 release notes](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.7) for per-channel quiet hours and dual-brand recognition. Receiver Power/Volume and ZoneAlarming writes remain experimental until physically tested; local monitoring and cloud-alarm handling remain available.
 
 ## Installation with HACS
 
@@ -49,9 +49,9 @@ See the [latest published GitHub Release](https://github.com/gigabytegrove/hosma
 1. Open **HACS** in Home Assistant.
 2. Select the three-dot menu in the upper-right corner, then **Custom repositories**.
 3. Enter `https://github.com/gigabytegrove/hosmart-home-assistant` and select **Integration** as the type.
-4. Select **Add**, open **Ho-Smart for Home Assistant** in HACS, and download the latest release.
+4. Select **Add**, open **Ho-Smart & eMACROS for Home Assistant** in HACS, and download the latest release.
 5. Restart Home Assistant.
-6. Go to **Settings → Devices & services → Add integration** and search for **Ho-Smart**.
+6. Go to **Settings → Devices & services → Add integration** and search for **Ho-Smart & eMACROS**.
 7. Follow the setup prompts.
 
 **Note:** This is a custom HACS repository, not currently listed in HACS's default catalog. The badge opens the custom repository in your HACS installation; it does not bypass the download, restart, or initial configuration steps. HACS must already be installed.
@@ -182,9 +182,9 @@ To enable Hybrid mode:
 
 The credentials are used to connect the existing receiver entry to the correct Ho-Smart account and are then discarded.
 
-## Nighttime quiet hours (v0.2.6)
+## Receiver-wide quiet hours (introduced v0.2.6)
 
-The schedules and options are available in v0.2.6. **Receiver write control
+Receiver-wide scheduling was introduced in v0.2.6. **Receiver write control
 has not been hardware-qualified on HS006W firmware 2.0**; users should confirm
 operation on their own receiver before relying on it unattended.
 
@@ -225,6 +225,38 @@ supports property writes, but the vendor-specific HS006W `params`
 write semantics have not been validated with real hardware in this release.
 If the firmware rejects the command, the status becomes `error` and its
 existing read-only monitoring and cloud alarm ingestion remain available.
+
+## Channel-specific quiet hours (v0.2.7)
+
+This release adds individual policies for all four HS006W channels, under
+**Settings → Devices & services → Ho-Smart & eMACROS → Configure**.
+
+| Setting | Behavior |
+| --- | --- |
+| Follow receiver-wide schedule | Quiet during the receiver's start/end window |
+| Always active | Keeps this channel armed; blocks receiver-wide audio mute/power-off |
+| Custom channel quiet hours | Own start/end, independent of the receiver schedule |
+
+For example, with the receiver default **10 PM–7 AM**, make
+**Channel 1 (Driveway)** **Always active** and leave Channels 2–4 on
+**Follow receiver-wide schedule**. From 10 PM, only zones 2–4 are scheduled
+to disarm. Receiver power and master audio remain enabled so Channel 1
+can still sound. At 7 AM, prior armed states are restored. Each channel
+can also use entirely different times.
+
+**Critical limitation:** HS006W exposes a shared master Volume and zone
+armed states (`ZoneAlarming1` through `ZoneAlarming4`), not proven
+individual channel volume controls. A selectively quieted channel is
+therefore **disarmed**, which may suppress both the physical chime and
+that channel's cloud notice. Do not select channels requiring continuous
+detection. Power/Volume and ZoneAlarming write behavior is still unverified
+on real hardware. Failed commands are logged, retried with backoff,
+and never reported as successful silent operation.
+
+Global master mute/power-off happens only when **all four** channels are
+scheduled quiet; otherwise selective zone disarming takes precedence.
+Existing v0.2.6 settings are preserved when all channels inherit. Each
+channel has a diagnostic status and pending restorations survive restarts.
 
 ## Privacy and security
 
@@ -286,7 +318,7 @@ See [SUPPORT.md](SUPPORT.md) for more information.
 | --- | --- | --- |
 | Ho-Smart HS006W | 2.0 | Verified |
 
-Other Ho-Smart, Hosmart, or eMACROS receivers may share similar hardware or protocols, but they should not be considered supported until they have been tested.
+Ho-Smart and eMACROS are related brands, but their different product kits are not necessarily compatible. Receiver models other than the verified HS006W/firmware 2.0 require independent device testing.
 
 If you have another model and want support added, open a device support request with the exact model and firmware.
 
@@ -316,7 +348,7 @@ These logs are rotated automatically.
 
 ## Project status
 
-The integration is built around behavior verified on real hardware rather than assumed compatibility.
+The integration recognizes both Ho-Smart and eMACROS; hardware compatibility is based on verified receiver model/protocol behavior, not merely the brand.
 
 The current integration version is listed in [Current release](#current-release), and the authoritative published version is available on [GitHub Releases](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest). Verified device support remains limited to the **HS006W with firmware 2.0**. Future releases must preserve known-good local and Hybrid behavior unless testing supports a change.
 

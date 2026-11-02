@@ -82,7 +82,7 @@ jobs:
               intended_body="$(cat "$notes")"
               if [[ "$published_body" != "$intended_body" ]]; then
                 gh release edit "$note_tag" \
-                  --title "Ho-Smart for Home Assistant $note_tag" \
+                  --title "Ho-Smart & eMACROS for Home Assistant $note_tag" \
                   --notes-file "$notes"
                 echo "Updated descriptive release notes for $note_tag."
               fi
@@ -96,5 +96,5 @@ jobs:
 
           gh release create "$TAG" \
             --target "$VALIDATED_SHA" \
-            --title "Ho-Smart for Home Assistant $TAG" \
+            --title "Ho-Smart & eMACROS for Home Assistant $TAG" \
             --notes-file "$NOTES_FILE"

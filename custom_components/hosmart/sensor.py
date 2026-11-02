@@ -1,4 +1,4 @@
-"""Sensors for Ho-Smart receivers."""
+"""Sensors for Ho-Smart / eMACROS receivers."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from .entity import HosmartEntity
 
 @dataclass(frozen=True, kw_only=True)
 class HosmartSensorDescription(SensorEntityDescription):
-    """Describe a Ho-Smart sensor."""
+    """Describe a Ho-Smart / eMACROS sensor."""
 
     value_fn: Callable[[HosmartCoordinator], Any]
     requires_local: bool = False
@@ -45,6 +45,38 @@ def _udp_time_value(coordinator: HosmartCoordinator) -> str:
 
 
 SENSORS = (
+    HosmartSensorDescription(
+        key="channel_1_quiet_status",
+        name="Channel 1 quiet status",
+        icon="mdi:volume-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        requires_local=True,
+        value_fn=lambda c: c.channel_quiet_status.get(1, "active"),
+    ),
+    HosmartSensorDescription(
+        key="channel_2_quiet_status",
+        name="Channel 2 quiet status",
+        icon="mdi:volume-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        requires_local=True,
+        value_fn=lambda c: c.channel_quiet_status.get(2, "active"),
+    ),
+    HosmartSensorDescription(
+        key="channel_3_quiet_status",
+        name="Channel 3 quiet status",
+        icon="mdi:volume-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        requires_local=True,
+        value_fn=lambda c: c.channel_quiet_status.get(3, "active"),
+    ),
+    HosmartSensorDescription(
+        key="channel_4_quiet_status",
+        name="Channel 4 quiet status",
+        icon="mdi:volume-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        requires_local=True,
+        value_fn=lambda c: c.channel_quiet_status.get(4, "active"),
+    ),
     HosmartSensorDescription(
         key="night_quiet_status",
         name="Night quiet status",
@@ -214,7 +246,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Ho-Smart sensors."""
+    """Set up Ho-Smart / eMACROS sensors."""
     coordinator: HosmartCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     async_add_entities(
         HosmartSensor(coordinator, description)
@@ -224,7 +256,7 @@ async def async_setup_entry(
 
 
 class HosmartSensor(HosmartEntity, SensorEntity):
-    """A Ho-Smart sensor."""
+    """A Ho-Smart / eMACROS sensor."""
 
     entity_description: HosmartSensorDescription
 

@@ -1,4 +1,4 @@
-"""Persistent structured debug capture for Ho-Smart."""
+"""Persistent structured debug capture for Ho-Smart / eMACROS."""
 
 from __future__ import annotations
 
