@@ -105,6 +105,57 @@ class OptionsTests(unittest.TestCase):
             },
         }
 
+    def test_off_channel_hides_inputs_and_preserves_saved_times(self):
+        stored = {
+            "mode": "custom",
+            "action": "disarm",
+            "start": "21:15:00",
+            "end": "05:45:00",
+        }
+        result = S.merge_schedule_section(
+            stored, {"mode": "always_active"}, channel=2
+        )
+        self.assertEqual(result, {
+            **stored, "mode": "always_active"
+        })
+        result = S.merge_schedule_section(
+            result, {"mode": "custom"}, channel=2
+        )
+        self.assertEqual(result["start"], "21:15:00")
+        self.assertEqual(result["end"], "05:45:00")
+
+    def test_inherited_channel_preserves_times_when_hidden(self):
+        saved = {
+            "mode": "custom",
+            "action": "arm",
+            "start": "19:00:00",
+            "end": "06:00:00",
+        }
+        result = S.merge_schedule_section(
+            saved, {"mode": "inherit"}, channel=1
+        )
+        self.assertEqual(result["action"], "arm")
+        self.assertEqual(result["start"], "19:00:00")
+        self.assertEqual(result["end"], "06:00:00")
+
+    def test_disabled_default_hides_fields_without_erasing_schedule(self):
+        saved = {
+            "enabled": True,
+            "action": "disarm",
+            "start": "23:00:00",
+            "end": "04:30:00",
+        }
+        result = S.merge_schedule_section(saved, {"enabled": False})
+        self.assertEqual(result["enabled"], False)
+        self.assertEqual(result["start"], "23:00:00")
+        self.assertEqual(result["end"], "04:30:00")
+
+    def test_no_hidden_fields_can_accidentally_set_invalid_mode(self):
+        with self.assertRaises(ValueError):
+            S.merge_schedule_section({}, {"mode": "invalid"}, channel=2)
+        with self.assertRaises(ValueError):
+            S.merge_schedule_section({}, {}, channel=2)
+
     def test_change_channel_two_without_touching_one_or_three(self):
         result = S.updated_quiet_options(
             self.existing, key="end", value="08:15:00", channel=2
