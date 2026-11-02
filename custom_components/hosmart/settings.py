@@ -32,7 +32,10 @@ from .const import (
 )
 from .night_schedule import parse_time
 
-RECEIVER_ACTIONS = (QUIET_ACTION_MUTE, QUIET_ACTION_POWER)
+RECEIVER_ACTIONS = (
+    "arm", "disarm", "mute_tone", QUIET_ACTION_MUTE, QUIET_ACTION_POWER
+)
+CHANNEL_ACTIONS = ("arm", "disarm", "mute_tone")
 RECEIVER_TIMES = (CONF_QUIET_START, CONF_QUIET_END)
 
 
@@ -46,6 +49,8 @@ def get_channel_setting(entry: ConfigEntry, channel: int, field: str) -> str:
         item = {}
     if field == "mode":
         return str(item.get(field, CHANNEL_INHERIT))
+    if field == "action":
+        return str(item.get(field, "disarm"))
     return str(
         item.get(
             field,
@@ -78,11 +83,14 @@ def updated_quiet_options(
             raise ValueError("Unknown receiver quiet-hours setting")
         options[key] = value
     else:
-        if channel not in (1, 2, 3, 4) or key not in ("mode", "start", "end"):
+        if channel not in (1, 2, 3, 4) or key not in ("mode", "action", "start", "end"):
             raise ValueError("Unknown channel quiet-hours setting")
         if key == "mode":
             if value not in CHANNEL_MODES:
                 raise ValueError("Unsupported channel quiet-hours mode")
+        elif key == "action":
+            if value not in CHANNEL_ACTIONS:
+                raise ValueError("Unsupported channel schedule action")
         else:
             if not isinstance(value, str):
                 raise ValueError("Channel quiet-hours time must be ISO local time")
@@ -112,6 +120,8 @@ def updated_quiet_options(
             mode = rule.get("mode", CHANNEL_INHERIT)
             if mode not in CHANNEL_MODES:
                 raise ValueError(f"Invalid Channel {i} mode")
+            if rule.get("action", "disarm") not in CHANNEL_ACTIONS:
+                raise ValueError(f"Invalid Channel {i} action")
             if mode == CHANNEL_CUSTOM:
                 has_custom = True
                 if parse_time(rule.get("start", DEFAULT_QUIET_START)) == parse_time(

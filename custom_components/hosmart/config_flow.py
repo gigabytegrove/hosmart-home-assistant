@@ -10,6 +10,7 @@ from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import section
 from homeassistant.helpers import selector
 
 from .client import (
@@ -24,25 +25,31 @@ from .cloud import (
     get_account_setup,
 )
 from .const import (
-    CONF_CHANNEL_NAMES,
-    CONF_CHANNEL_QUIET,
-    CHANNEL_INHERIT,
     CHANNEL_ALWAYS_ACTIVE,
     CHANNEL_CUSTOM,
-    CONF_MODE,
-    CONF_QUIET_ENABLED,
+    CHANNEL_INHERIT,
+    CONF_CHANNEL_NAMES,
     CONF_CHANNEL_QUIET,
-    CHANNEL_CUSTOM,
+    CONF_MODE,
     CONF_NODE_ID,
     CONF_POP,
+    CONF_QUIET_ACTION,
+    CONF_QUIET_ENABLED,
+    CONF_QUIET_END,
+    CONF_QUIET_START,
     CONF_USER_ID,
     DEFAULT_MODE,
     DEFAULT_PORT,
+    DEFAULT_QUIET_ACTION,
+    DEFAULT_QUIET_END,
+    DEFAULT_QUIET_START,
     DOMAIN,
     MODE_CLOUD,
     MODE_HYBRID,
     MODE_LOCAL,
 )
+from .night_schedule import parse_time
+from .settings import updated_quiet_options
 
 
 MODE_OPTIONS = [
@@ -257,53 +264,227 @@ class HosmartConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class HosmartOptionsFlow(OptionsFlow):
-    """Connection mode only; quiet hours are editable device entities."""
+    """One form with Default, Ch. 1–4 sections and connection mode.
+
+    Unlike the obsolete sequential wizard, every channel is configurable
+    before a single Save. Existing per-channel settings are read unchanged.
+    """
 
     _pending_mode: str | None = None
     _pending_options: dict[str, Any] | None = None
 
+    @staticmethod
+    def _mode_selector() -> selector.SelectSelector:
+        return selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=MODE_OPTIONS,
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        )
+
+    @staticmethod
+    def _action_selector(*, default: bool) -> selector.SelectSelector:
+        options = [
+            {"value": "disarm", "label": "Disarm zone during window"},
+            {"value": "arm", "label": "Arm zone during window"},
+            {
+                "value": "mute_tone",
+                "label": "Mute only that tone (unsupported on verified HS006W)",
+            },
+        ]
+        if default:
+            options.extend(
+                [
+                    {
+                        "value": "mute",
+                        "label": "Mute ENTIRE receiver (legacy)",
+                    },
+                    {
+                        "value": "power_off",
+                        "label": "Power off ENTIRE receiver (legacy)",
+                    },
+                ]
+            )
+        return selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=options,
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        )
+
+    def _section_data(
+        self, section_name: str, submitted: dict[str, Any],
+    ) -> dict[str, Any]:
+        options = self.config_entry.options
+        values = submitted.get(section_name, {})
+        return values if isinstance(values, dict) else {}
+
     async def async_step_init(self, user_input=None) -> ConfigFlowResult:
-        """Keep Configure limited to connection mode, not everyday schedules."""
-        current = self.config_entry.options.get(
+        """Present all five independent collapsible sections in one form."""
+        old = self.config_entry.options
+        current_mode = old.get(
             CONF_MODE,
             MODE_LOCAL if CONF_USER_ID not in self.config_entry.data else DEFAULT_MODE,
         )
+        provided = user_input or {}
         errors: dict[str, str] = {}
+
         if user_input is not None:
-            mode = user_input[CONF_MODE]
-            options = {**self.config_entry.options, CONF_MODE: mode}
-            if mode == MODE_CLOUD:
-                rules = options.get(CONF_CHANNEL_QUIET, {})
-                custom = any(
-                    isinstance(rule, dict) and rule.get("mode") == CHANNEL_CUSTOM
-                    for rule in (rules.values() if isinstance(rules, dict) else [])
-                )
-                runtime = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
-                quiet = runtime.get("quiet") if runtime else None
-                has_restore = bool(getattr(quiet, "_managed", {}))
-                if options.get(CONF_QUIET_ENABLED) or custom or has_restore:
-                    errors["base"] = "quiet_requires_local"
+            options = dict(old)
+            default = provided.get("default", {})
+            if not isinstance(default, dict):
+                errors["base"] = "invalid_schedule"
+            else:
+                try:
+                    for option, key in (
+                        ("enabled", CONF_QUIET_ENABLED),
+                        ("action", CONF_QUIET_ACTION),
+                        ("start", CONF_QUIET_START),
+                        ("end", CONF_QUIET_END),
+                    ):
+                        options = updated_quiet_options(
+                            options, key=key, value=default[option]
+                        )
+                    for index in range(1, 5):
+                        values = provided[f"ch{index}"]
+                        if not isinstance(values, dict):
+                            raise ValueError("Invalid channel section")
+                        for field in ("mode", "action", "start", "end"):
+                            options = updated_quiet_options(
+                                options, channel=index, key=field,
+                                value=values[field],
+                            )
+                    selected_mode = provided[CONF_MODE]
+                    options[CONF_MODE] = selected_mode
+                    # Check mode after merging all fields; a Cloud-only
+                    # transition cannot abandon pending local restoration.
+                    options = updated_quiet_options(
+                        options, key=CONF_QUIET_ENABLED,
+                        value=options.get(CONF_QUIET_ENABLED, False),
+                    )
+                    runtime = self.hass.data.get(DOMAIN, {}).get(
+                        self.config_entry.entry_id
+                    )
+                    quiet = runtime.get("quiet") if runtime else None
+                    if selected_mode == MODE_CLOUD and getattr(quiet, "_managed", {}):
+                        raise ValueError(
+                            "Restore existing local schedule changes before "
+                            "switching to Cloud-only mode"
+                        )
+                except (KeyError, TypeError, ValueError) as err:
+                    errors["base"] = "invalid_schedule"
             if not errors:
-                if mode in (MODE_CLOUD, MODE_HYBRID) and not self.config_entry.data.get(
-                    CONF_USER_ID
+                if options == dict(old):
+                    return self.async_create_entry(data=options)
+                if (
+                    options[CONF_MODE] in (MODE_CLOUD, MODE_HYBRID)
+                    and not self.config_entry.data.get(CONF_USER_ID)
                 ):
-                    self._pending_mode = mode
+                    self._pending_mode = options[CONF_MODE]
                     self._pending_options = options
                     return await self.async_step_cloud_credentials()
                 return self.async_create_entry(data=options)
 
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
+        default_saved = self._section_data("default", provided)
+        default_schema = vol.Schema(
+            {
+                vol.Required(
+                    "enabled",
+                    default=default_saved.get(
+                        "enabled", old.get(CONF_QUIET_ENABLED, False)
+                    ),
+                ): selector.BooleanSelector(),
+                vol.Required(
+                    "action",
+                    default=default_saved.get(
+                        "action", old.get(CONF_QUIET_ACTION, DEFAULT_QUIET_ACTION)
+                    ),
+                ): self._action_selector(default=True),
+                vol.Required(
+                    "start",
+                    default=default_saved.get(
+                        "start", old.get(CONF_QUIET_START, DEFAULT_QUIET_START)
+                    ),
+                ): selector.TimeSelector(),
+                vol.Required(
+                    "end",
+                    default=default_saved.get(
+                        "end", old.get(CONF_QUIET_END, DEFAULT_QUIET_END)
+                    ),
+                ): selector.TimeSelector(),
+            }
+        )
+
+        fields: dict[Any, Any] = {
+            vol.Required("default"): section(
+                default_schema, {"collapsed": False}
+            ),
+        }
+        rules = old.get(CONF_CHANNEL_QUIET, {})
+        if not isinstance(rules, dict):
+            rules = {}
+        for index in range(1, 5):
+            name = f"ch{index}"
+            submitted = self._section_data(name, provided)
+            saved = rules.get(str(index), {})
+            if not isinstance(saved, dict):
+                saved = {}
+            schema = vol.Schema(
                 {
-                    vol.Required(CONF_MODE, default=current): selector.SelectSelector(
+                    vol.Required(
+                        "mode",
+                        default=submitted.get(
+                            "mode", saved.get("mode", CHANNEL_INHERIT)
+                        ),
+                    ): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=MODE_OPTIONS,
+                            options=[
+                                {
+                                    "value": CHANNEL_INHERIT,
+                                    "label": "Use Default",
+                                },
+                                {
+                                    "value": CHANNEL_ALWAYS_ACTIVE,
+                                    "label": "Always armed (exclude from schedule)",
+                                },
+                                {
+                                    "value": CHANNEL_CUSTOM,
+                                    "label": "Use this channel's schedule",
+                                },
+                            ],
                             mode=selector.SelectSelectorMode.DROPDOWN,
                         )
-                    )
+                    ),
+                    vol.Required(
+                        "action",
+                        default=submitted.get(
+                            "action", saved.get("action", "disarm")
+                        ),
+                    ): self._action_selector(default=False),
+                    vol.Required(
+                        "start",
+                        default=submitted.get(
+                            "start", saved.get("start", DEFAULT_QUIET_START)
+                        ),
+                    ): selector.TimeSelector(),
+                    vol.Required(
+                        "end",
+                        default=submitted.get(
+                            "end", saved.get("end", DEFAULT_QUIET_END)
+                        ),
+                    ): selector.TimeSelector(),
                 }
-            ),
+            )
+            fields[vol.Required(name)] = section(
+                schema, {"collapsed": True}
+            )
+
+        fields[vol.Required(
+            CONF_MODE, default=provided.get(CONF_MODE, current_mode)
+        )] = self._mode_selector()
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(fields),
             errors=errors,
         )
 
