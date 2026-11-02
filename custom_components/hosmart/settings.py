@@ -59,6 +59,52 @@ def get_channel_setting(entry: ConfigEntry, channel: int, field: str) -> str:
     )
 
 
+
+def merge_schedule_section(
+    stored: dict[str, Any],
+    submitted: dict[str, Any],
+    *,
+    channel: int | None = None,
+) -> dict[str, Any]:
+    """Preserve hidden schedule values on form submission.
+
+    Home Assistant 2026.11+ intentionally omits fields that are hidden
+    by a visible condition. Never replace their saved time or action with
+    a default just because they were not submitted.
+    """
+    if not isinstance(stored, dict) or not isinstance(submitted, dict):
+        raise ValueError("Invalid schedule section")
+    if channel is None:
+        if "enabled" not in submitted or type(submitted["enabled"]) is not bool:
+            raise ValueError("Default schedule requires an enable state")
+        return {
+            "enabled": submitted["enabled"],
+            "action": submitted.get(
+                "action", stored.get("action", "disarm")
+            ),
+            "start": submitted.get(
+                "start", stored.get("start", DEFAULT_QUIET_START)
+            ),
+            "end": submitted.get(
+                "end", stored.get("end", DEFAULT_QUIET_END)
+            ),
+        }
+    if channel not in (1, 2, 3, 4):
+        raise ValueError("Unknown channel number")
+    if submitted.get("mode") not in CHANNEL_MODES:
+        raise ValueError("Unknown channel schedule mode")
+    return {
+        "mode": submitted["mode"],
+        "action": submitted.get("action", stored.get("action", "disarm")),
+        "start": submitted.get(
+            "start", stored.get("start", DEFAULT_QUIET_START)
+        ),
+        "end": submitted.get(
+            "end", stored.get("end", DEFAULT_QUIET_END)
+        ),
+    }
+
+
 def updated_quiet_options(
     old: dict[str, Any],
     *,
