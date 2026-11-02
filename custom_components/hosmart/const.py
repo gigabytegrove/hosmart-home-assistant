@@ -22,6 +22,16 @@ CONF_NODE_ID = "node_id"
 CONF_MODE = "connection_mode"
 CONF_CHANNEL_NAMES = "channel_names"
 
+CONF_QUIET_ENABLED = "quiet_enabled"
+CONF_QUIET_START = "quiet_start"
+CONF_QUIET_END = "quiet_end"
+CONF_QUIET_ACTION = "quiet_action"
+QUIET_ACTION_MUTE = "mute"
+QUIET_ACTION_POWER = "power_off"
+DEFAULT_QUIET_ACTION = QUIET_ACTION_MUTE
+DEFAULT_QUIET_START = "22:00:00"
+DEFAULT_QUIET_END = "07:00:00"
+
 MODE_LOCAL = "local"
 MODE_CLOUD = "cloud"
 MODE_HYBRID = "hybrid"
