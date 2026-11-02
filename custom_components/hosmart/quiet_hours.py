@@ -168,7 +168,10 @@ class HosmartQuietHours:
         original = self._state["original"]
 
         if current == target and current != original:
-            if not await self._write(key, original):
+            # Some firmware reports Power as 0/1 rather than JSON booleans.
+            # The writer requires a real bool to prevent accidental coercion.
+            restored_value = bool(original) if key == "Power" else original
+            if not await self._write(key, restored_value):
                 return False
         await self._save_state(None)
         return True
