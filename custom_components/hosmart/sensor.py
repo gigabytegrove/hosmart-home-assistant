@@ -46,6 +46,13 @@ def _udp_time_value(coordinator: HosmartCoordinator) -> str:
 
 SENSORS = (
     HosmartSensorDescription(
+        key="release_channel_status",
+        name="Update channel status",
+        icon="mdi:source-branch",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda c: c.release_channel_status,
+    ),
+    HosmartSensorDescription(
         key="channel_1_quiet_status",
         name="Channel 1 quiet status",
         icon="mdi:volume-off",

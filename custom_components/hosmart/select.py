@@ -93,7 +93,7 @@ class HosmartQuietSelect(HosmartEntity, SelectEntity):
 class HosmartSoftwareChannel(HosmartEntity, SelectEntity):
     """Persist the requested HACS installation channel; no automatic install."""
 
-    _attr_name = "90 Software channel"
+    _attr_name = "Update channel"
     _attr_icon = "mdi:source-branch"
     _attr_entity_category = EntityCategory.CONFIG
     _attr_options = ["Main (stable)", "Dev (beta)"]
