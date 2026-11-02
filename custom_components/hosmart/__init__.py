@@ -32,6 +32,7 @@ from .hacs_channel import (
     async_apply_release_channel,
     selected_channel,
 )
+from .legacy_entities import detach_legacy_schedule_entities
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -163,7 +164,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     quiet = HosmartQuietHours(hass, entry, coordinator)
     hass.data[DOMAIN][entry.entry_id]["quiet"] = quiet
     await quiet.async_start()
-    _hide_legacy_schedule_entities(hass, entry, coordinator)
+    detach_legacy_schedule_entities(
+        er.async_get(hass),
+        platform=DOMAIN,
+        node_id=coordinator.node_id or entry.entry_id,
+        entry_id=entry.entry_id,
+    )
     align_receiver_preferences(hass, entry)
     # A HACS Pre-release switch may not exist until Marketplace loads, or
     # until its disabled-by-default registry entry is enabled. Polling is
@@ -183,55 +189,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id]["channel_sync_unsub"] = unsub
     await _async_sync_channel(hass, entry)
     return True
-
-
-def _hide_legacy_schedule_entities(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    coordinator: HosmartCoordinator,
-) -> None:
-    """One-time reversible UI migration: hide old flat schedule controls.
-
-    Their registry IDs and automation access remain intact. The edit form
-    replaces the old flat list. Do not hide again if the user later chooses
-    to make one visible manually.
-    """
-    key = "_grouped_schedule_ui_migrated"
-    if entry.options.get(key):
-        return
-    registry = er.async_get(hass)
-    node_id = coordinator.node_id or entry.entry_id
-    ids = [
-        ("time", "receiver_quiet_start"),
-        ("time", "receiver_quiet_end"),
-        ("select", "receiver_quiet_action"),
-    ]
-    for index in range(1, 5):
-        ids.extend(
-            (
-                ("time", f"channel_{index}_quiet_start"),
-                ("time", f"channel_{index}_quiet_end"),
-                ("select", f"channel_{index}_quiet_mode"),
-            )
-        )
-    for domain, name in ids:
-        entity_id = registry.async_get_entity_id(
-            domain, DOMAIN, f"{node_id}_{name}"
-        )
-        if entity_id is None:
-            continue
-        item = registry.async_get(entity_id)
-        if (
-            item is not None
-            and item.config_entry_id == entry.entry_id
-            and item.hidden_by is None
-        ):
-            registry.async_update_entity(
-                entity_id, hidden_by=er.RegistryEntryHider.INTEGRATION
-            )
-    hass.config_entries.async_update_entry(
-        entry, options={**entry.options, key: True}
-    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

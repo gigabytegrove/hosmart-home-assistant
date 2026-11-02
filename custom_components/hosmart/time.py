@@ -1,4 +1,4 @@
-"""Always-visible receiver and per-channel time pickers."""
+"""Legacy time entities retained for automations, not the receiver device UI."""
 
 from __future__ import annotations
 
@@ -44,6 +44,13 @@ class HosmartQuietTime(HosmartEntity, TimeEntity):
 
     _attr_entity_registry_visible_default = False
 
+    # The grouped options flow is the sole receiver-device schedule editor.
+    # Legacy time entities remain available for existing automations, but
+    # must not reattach to the receiver during an integration reload.
+    @property
+    def device_info(self) -> None:
+        return None
+
     _attr_icon = "mdi:clock-outline"
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -54,20 +61,10 @@ class HosmartQuietTime(HosmartEntity, TimeEntity):
         super().__init__(coordinator, f"{prefix}_quiet_{boundary}")
         self._channel = channel
         self._boundary = boundary
-        # The device page sorts entities by display name, not by registration
-        # order. Short, numbered labels keep each pair readable on mobile and
-        # make START appear before END instead of the reverse.
-        # Home Assistant orders the configuration list by entity name.
-        # Stable numeric groups keep master before channels, and Start
-        # immediately before End in the narrow device-page layout.
-        if channel is None:
-            order = "02" if boundary == "start" else "03"
-            self._attr_name = f"{order} Main: {'Start' if boundary == 'start' else 'End'}"
-        else:
-            order = f"{channel}1" if boundary == "start" else f"{channel}2"
-            self._attr_name = (
-                f"{order} Ch{channel}: {'Start' if boundary == 'start' else 'End'}"
-            )
+        group = "Default" if channel is None else f"Ch. {channel}"
+        self._attr_name = (
+            f"{group} start" if boundary == "start" else f"{group} end"
+        )
 
     @property
     def native_value(self) -> time:

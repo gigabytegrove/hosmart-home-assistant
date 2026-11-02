@@ -55,6 +55,12 @@ class HosmartQuietSelect(HosmartEntity, SelectEntity):
 
     _attr_entity_registry_visible_default = False
 
+    # Preserve old entity IDs for automations, while the device page now
+    # shows only the grouped Configure editor.
+    @property
+    def device_info(self) -> None:
+        return None
+
     _attr_icon = "mdi:tune-vertical"
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -65,8 +71,8 @@ class HosmartQuietSelect(HosmartEntity, SelectEntity):
         self._choices = RECEIVER_ACTIONS if channel is None else CHANNEL_ACTIONS
         self._attr_options = list(self._choices)
         self._attr_name = (
-            "01 Main: Action" if channel is None
-            else f"{channel}0 Ch{channel}: Mode"
+            "Default action" if channel is None
+            else f"Ch. {channel} schedule"
         )
 
     @property
