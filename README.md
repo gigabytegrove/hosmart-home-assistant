@@ -226,6 +226,38 @@ write semantics have not been validated with real hardware in this release.
 If the firmware rejects the command, the status becomes `error` and its
 existing read-only monitoring and cloud alarm ingestion remain available.
 
+## Channel-specific quiet hours (development — not in v0.2.6)
+
+The next update adds separate policies for all four HS006W channels, under
+**Settings → Devices & services → Ho-Smart → Configure**.
+
+| Setting | Behavior |
+| --- | --- |
+| Follow receiver-wide schedule | Quiet during the receiver's start/end window |
+| Always active | Keeps this channel armed; blocks receiver-wide audio mute/power-off |
+| Custom channel quiet hours | Own start/end, independent of the receiver schedule |
+
+For example, with the receiver default **10 PM–7 AM**, make
+**Channel 1 (Driveway)** **Always active** and leave Channels 2–4 on
+**Follow receiver-wide schedule**. From 10 PM, only zones 2–4 are scheduled
+to disarm. Receiver power and master audio remain enabled so Channel 1
+can still sound. At 7 AM, prior armed states are restored. Each channel
+can also use entirely different times.
+
+**Critical limitation:** HS006W exposes a shared master Volume and zone
+armed states (`ZoneAlarming1` through `ZoneAlarming4`), not proven
+individual channel volume controls. A selectively quieted channel is
+therefore **disarmed**, which may suppress both the physical chime and
+that channel's cloud notice. Do not select channels requiring continuous
+detection. Power/Volume and ZoneAlarming write behavior is still unverified
+on real hardware. Failed commands are logged, retried with backoff,
+and never reported as successful silent operation.
+
+Global master mute/power-off happens only when **all four** channels are
+scheduled quiet; otherwise selective zone disarming takes precedence.
+Existing v0.2.6 settings are preserved when all channels inherit. Each
+channel has a diagnostic status and pending restorations survive restarts.
+
 ## Privacy and security
 
 The integration stores the receiver information required for local communication.

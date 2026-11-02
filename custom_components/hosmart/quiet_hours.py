@@ -189,13 +189,23 @@ class HosmartQuietHours:
         )
 
     def _set_status(self, status: str, zones: tuple[int, ...] = ()) -> None:
+        """Expose failed writes as errors instead of a false quiet success."""
         changed = self.coordinator.quiet_status != status
-        new_zones = {
-            index: ("quiet" if index in zones else "active")
-            for index in range(1, 5)
-        }
-        if self.coordinator.channel_quiet_status != new_zones:
-            self.coordinator.channel_quiet_status = new_zones
+        states: dict[int, str] = {}
+        for index in range(1, 5):
+            rule = self.channels.get(str(index), {})
+            protected = isinstance(rule, dict) and rule.get("mode") == "always_active"
+            if index in zones:
+                states[index] = (
+                    status if status in ("error", "unsupported", "waiting_receiver")
+                    else "quiet"
+                )
+            elif protected:
+                states[index] = "protected"
+            else:
+                states[index] = "active"
+        if self.coordinator.channel_quiet_status != states:
+            self.coordinator.channel_quiet_status = states
             changed = True
         self.coordinator.quiet_status = status
         if changed:
@@ -305,6 +315,17 @@ class HosmartQuietHours:
                     return
 
             if desired:
-                self._set_status("quiet", effective_zones)
+                self._set_status(
+                    "quiet" if len(effective_zones) == 4 else "partially_quiet",
+                    effective_zones,
+                )
             else:
-                self._set_status("daytime" if configured else "disabled")
+                protected = any(
+                    isinstance(rule, dict) and rule.get("mode") == "always_active"
+                    for rule in self.channels.values()
+                )
+                self._set_status(
+                    "protected" if self.enabled and protected else (
+                        "daytime" if configured else "disabled"
+                    )
+                )
