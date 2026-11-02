@@ -36,9 +36,46 @@ For the HS006W, the receiver exposes normal status locally but does not expose d
 
 ## Current release
 
-**Current integration version: v0.2.8**
+**Current integration version: v0.2.9-dev.1**
 
-See the [latest GitHub release](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest) and [v0.2.8 release notes](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.8) for the direct device controls that replace the multi-step quiet-hours configuration wizard. Existing settings are retained automatically. Receiver Power/Volume and ZoneAlarming writes remain experimental until confirmed on physical HS006W hardware.
+**Development preview:** v0.2.9-dev.1 is a prerelease built from `dev`. The production release remains [v0.2.8](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.8) from `main`. Use HACS's specific-version chooser to install the beta (or use the new **Software channel** and **Install selected channel** controls when HACS exposes a supported update entity). Selecting a channel alone does **not** install software. All installs require a Home Assistant restart. Power/Volume and ZoneAlarming writes are not hardware-qualified on HS006W.
+
+## Main and dev installation channels
+
+| Track | GitHub branch | HACS installer selection | Intended use |
+| --- | --- | --- | --- |
+| **Main (stable)** | `main` | Latest normal GitHub release, currently v0.2.8 | Everyday use |
+| **Dev (beta)** | `dev` | Latest published `vX.Y.Z-dev.N` GitHub prerelease | Explicit opt-in testing |
+
+You can select **Software channel** on the receiver device page and press
+**Install selected channel** to request the chosen *published release* through
+Home Assistant's `update.install` service. The operation locates the
+Ho-Smart HACS update entity and asks HACS to install the exact version.
+**It does not directly edit files and never silently updates just because
+you change the selector.** If the matching HACS updater cannot be identified,
+or it does not support specific-version installs, the button reports an
+actionable error instead of claiming that an installation succeeded.
+
+The supported manual fallback is always **HACS → Ho-Smart & eMACROS →
+Redownload → Need a different version? → select Release**, and choose the
+stable or `-dev.N` prerelease. HACS may require showing beta versions
+before they appear. Restart Home Assistant after download.
+
+The `hosmart` domain, existing entry IDs, receiver pairings, schedule data,
+and unique entity IDs are identical on both tracks; you cannot load both
+builds concurrently under the same domain. The `dev` release is **not**
+automatically promoted to `main`: it must pass validation and be merged.
+For development status, see the [dev branch](https://github.com/gigabytegrove/hosmart-home-assistant/tree/dev).
+
+## Configuration labels on narrow screens
+
+The Configuration section uses concise, ordered labels:
+**00 Main: Quiet hours**, **01 Main: Action**, **02 Main: Start**,
+**03 Main: End**, followed by **10 Ch1: Mode**, **11 Ch1: Start**,
+**12 Ch1: End** through Channel 4. These are one start/end pair per channel,
+**not duplicated schedules**. Previous labels were both truncated to
+“Channel N quiet…” and alphabetical sorting could put End above Start.
+Only display names change; stored times and entity unique IDs remain intact.
 
 ## Installation with HACS
 

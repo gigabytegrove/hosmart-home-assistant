@@ -14,8 +14,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 NOTES_DIR = ROOT / ".github" / "release-notes"
 MANIFEST = ROOT / "custom_components" / "hosmart" / "manifest.json"
-RELEASE_NAME = re.compile(r"^v(\d+\.\d+\.\d+)\.md$")
-H1 = re.compile(r"^#\s+Ho-Smart v(\d+\.\d+\.\d+)\b", re.I)
+RELEASE_NAME = re.compile(r"^v(\d+\.\d+\.\d+(?:-dev\.\d+)?)\.md$")
+H1 = re.compile(r"^#\s+Ho-Smart v(\d+\.\d+\.\d+(?:-dev\.\d+)?)\b", re.I)
 HEADING = re.compile(r"^##\s+(.+)$", re.M)
 
 

@@ -18,10 +18,10 @@ README = ROOT / "README.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
 
 VERSION_LINE = re.compile(
-    r"^\*\*Current integration version: v(\d+\.\d+\.\d+)\*\*\s*$",
+    r"^\*\*Current integration version: v(\d+\.\d+\.\d+(?:-dev\.\d+)?)\*\*\s*$",
     re.MULTILINE,
 )
-CHANGELOG_VERSION = re.compile(r"^##\s+(\d+\.\d+\.\d+)\s*$", re.MULTILINE)
+CHANGELOG_VERSION = re.compile(r"^##\s+(\d+\.\d+\.\d+(?:-dev\.\d+)?)\s*$", re.MULTILINE)
 STALE_CLAIMS = (
     re.compile(
         r"\bv(\d+\.\d+\.\d+)\s+(?:is|remains)\s+"
@@ -39,7 +39,7 @@ STALE_CLAIMS = (
 def validate(version: str, readme: str, changelog: str) -> list[str]:
     """Compare canonical version, README current-version claim, and changelog."""
     issues: list[str] = []
-    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+    if not re.fullmatch(r"\d+\.\d+\.\d+(?:-dev\.\d+)?", version):
         return [f"Invalid manifest version: {version!r}"]
 
     current = VERSION_LINE.findall(readme)

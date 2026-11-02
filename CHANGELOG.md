@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.9-dev.1
+
+**Purpose:** Preview corrected mobile-friendly quiet-hours labeling and the new main/dev development/release split without changing the v0.2.8 production build.
+
+- Create and use a persistent `dev` branch for implementation, validation and explicit GitHub prerelease builds; keep `main` limited to stable releases.
+- Rename device-page configuration controls to short, ordered names, placing receiver master settings first and clearly separating Channel 1–4 Start and End.
+- Add an opt-in **Software channel** selector and explicit **Install selected channel** button, using the HACS-managed `update.install` action for a published stable or development tag. Selecting a channel alone never alters installed code.
+- Fail closed if no compatible HACS update entity, specific-version installation support or published development release is available. Never write directly to integration files.
+- Keep the existing `hosmart` domain, entity unique IDs, per-channel schedules and local receiver behavior.
+- **Limitations:** Actual HACS installation on the user's Home Assistant and physical HS006W control commands have not been exercised by automated repository checks.
+
+See [detailed v0.2.9-dev.1 release notes](.github/release-notes/v0.2.9-dev.1.md).
+
+
 ## 0.2.8
 
 **Purpose:** Fix the unintuitive quiet-hours setup flow: channel schedules should be normal, visible device controls, not successive Configure forms.

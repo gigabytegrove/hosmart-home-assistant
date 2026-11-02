@@ -2,6 +2,21 @@
 
 Contributions are welcome, especially fixes, documentation improvements, and support for additional Ho-Smart / eMACROS-compatible receivers.
 
+## Branch and release discipline
+
+- `main` is production: the GitHub default branch and source of stable
+  HACS releases only. No feature work is committed directly to `main`.
+- `dev` is the integration/test branch. New work targets `dev` (or a
+  short-lived branch merged into `dev`), never directly to `main`.
+- A successful `Validate` run on an up-to-date `dev` commit may publish a
+  **GitHub prerelease** tagged `vX.Y.Z-dev.N`. These prereleases are an
+  opt-in HACS installation track, not production releases.
+- After testing and approval, merge a reviewed `dev` PR into `main`, update
+  the manifest and release notes to a stable `X.Y.Z` version, and only
+  then allow the existing stable Release workflow to publish it.
+- Never assume a pushed branch or passing CI is proof of physical HS006W
+  write compatibility. Record hardware-test evidence separately.
+
 ## Keep changes focused
 
 Please avoid unrelated rewrites in the same pull request. A focused change is easier to review, test, and safely release.

@@ -1,0 +1,65 @@
+name: Dev Prerelease
+
+on:
+  workflow_run:
+    workflows:
+      - Validate
+    types:
+      - completed
+    branches:
+      - dev
+
+permissions:
+  contents: write
+
+jobs:
+  prerelease:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out validated development commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Publish exact verified dev commit, never main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin dev main
+          if [[ "$(git rev-parse origin/dev)" != "$VALIDATED_SHA" ]]; then
+            echo "Skipping superseded dev validation."
+            exit 0
+          fi
+          VERSION="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path("custom_components/hosmart/manifest.json").read_text())["version"])
+          PY
+          )"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]]; then
+            echo "Not a prerelease manifest; no dev release."
+            exit 0
+          fi
+
+          python scripts/validate_release_notes.py
+          python scripts/validate_release_documentation.py
+
+          TAG="v$VERSION"
+          NOTES=".github/release-notes/$TAG.md"
+          test -s "$NOTES"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG already exists; never alter immutable release."
+            exit 0
+          fi
+
+          gh release create "$TAG" \
+            --target "$VALIDATED_SHA" \
+            --title "Ho-Smart & eMACROS $TAG — Development" \
+            --prerelease \
+            --notes-file "$NOTES"
