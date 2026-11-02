@@ -36,8 +36,25 @@ def _mode(entry: ConfigEntry) -> str:
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload when the Local / Cloud / Hybrid option changes."""
-    await hass.config_entries.async_reload(entry.entry_id)
+    """Apply schedule edits in place; reconnect only for actual connection changes."""
+    runtime = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if runtime is None:
+        return
+    signature = (
+        _mode(entry),
+        entry.data.get(CONF_HOST),
+        entry.data.get(CONF_PORT),
+        entry.data.get(CONF_POP),
+        entry.data.get(CONF_USER_ID),
+        entry.data.get(CONF_NODE_ID),
+    )
+    if signature != runtime["connection_signature"]:
+        await hass.config_entries.async_reload(entry.entry_id)
+        return
+    quiet: HosmartQuietHours | None = runtime.get("quiet")
+    if quiet is not None:
+        await quiet.async_options_updated()
+    runtime["coordinator"].async_update_listeners()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -94,6 +111,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "coordinator": coordinator,
         "udp_transport": udp_transport,
         "recorder": recorder,
+        "connection_signature": (
+            mode,
+            entry.data.get(CONF_HOST),
+            entry.data.get(CONF_PORT),
+            entry.data.get(CONF_POP),
+            entry.data.get(CONF_USER_ID),
+            entry.data.get(CONF_NODE_ID),
+        ),
     }
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
