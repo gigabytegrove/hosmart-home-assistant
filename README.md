@@ -36,9 +36,9 @@ For the HS006W, the receiver exposes normal status locally but does not expose d
 
 ## Current release
 
-**Current integration version: v0.2.8**
+**Current integration version: v0.2.9**
 
-See the [latest GitHub release](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest) and [v0.2.8 release notes](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.8) for the direct device controls that replace the multi-step quiet-hours configuration wizard. Existing settings are retained automatically. Receiver Power/Volume and ZoneAlarming writes remain experimental until confirmed on physical HS006W hardware.
+See the [latest GitHub release](https://github.com/gigabytegrove/hosmart-home-assistant/releases/latest) and [v0.2.9 release notes](https://github.com/gigabytegrove/hosmart-home-assistant/releases/tag/v0.2.9) for diagnostic privacy hardening. All existing quiet-hours controls and settings remain unchanged. Receiver Power/Volume and ZoneAlarming writes remain experimental until confirmed on physical HS006W hardware.
 
 ## Installation with HACS
 

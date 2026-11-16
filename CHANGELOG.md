@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.9
+
+- Security: redact binary payload bytes instead of exporting hexadecimal captures, and never return malformed raw JSONL lines in diagnostics.
+- Write new and existing debug logs, checkpoint files, and their directory with owner-only permissions (0700 directory / 0600 files).
+- Preserve previous cloud checkpoint data, alarm history, quiet-hours configuration and receiver control behavior.
+- Target Home Assistant Core 2026.11.1; live hardware interoperability remains unverified.
+
+
 ## 0.2.8
 
 **Purpose:** Fix the unintuitive quiet-hours setup flow: channel schedules should be normal, visible device controls, not successive Configure forms.

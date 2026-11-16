@@ -6,6 +6,7 @@ from collections import deque
 from datetime import datetime, timezone
 from functools import partial
 import json
+import os
 from pathlib import Path
 import threading
 from typing import Any
@@ -40,7 +41,7 @@ def redact(value: Any, key: str | None = None) -> Any:
     if isinstance(value, tuple):
         return [redact(item) for item in value]
     if isinstance(value, bytes):
-        return {"length": len(value), "hex": value.hex()}
+        return {"length": len(value), "redacted": "binary_payload"}
     return value
 
 
@@ -76,9 +77,17 @@ class HosmartDebugRecorder:
 
     @staticmethod
     def _append(path: Path, encoded: str) -> None:
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(encoded)
-            handle.write("\n")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags, 0o600)
+        try:
+            os.fchmod(descriptor, 0o600)
+            with os.fdopen(descriptor, "a", encoding="utf-8") as handle:
+                descriptor = -1
+                handle.write(encoded)
+                handle.write("\n")
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
 
     def record_sync(self, kind: str, **payload: Any) -> None:
         """Synchronously append one structured record."""
@@ -96,7 +105,8 @@ class HosmartDebugRecorder:
         )
 
         with self._lock:
-            self.directory.mkdir(parents=True, exist_ok=True)
+            self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+            self.directory.chmod(0o700)
 
             self._rotate_path(self.path)
             self._append(self.path, encoded)
@@ -121,9 +131,19 @@ class HosmartDebugRecorder:
         """Write atomically so crashes cannot damage the previous checkpoint."""
         encoded = json.dumps(checkpoint, ensure_ascii=False, separators=(",", ":"))
         with self._lock:
-            self.directory.mkdir(parents=True, exist_ok=True)
+            self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+            self.directory.chmod(0o700)
             temporary = self.cloud_checkpoint_path.with_suffix(".json.tmp")
-            temporary.write_text(encoded, encoding="utf-8")
+            flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+            descriptor = os.open(temporary, flags, 0o600)
+            try:
+                os.fchmod(descriptor, 0o600)
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    descriptor = -1
+                    handle.write(encoded)
+            finally:
+                if descriptor >= 0:
+                    os.close(descriptor)
             temporary.replace(self.cloud_checkpoint_path)
 
     async def async_record(self, kind: str, **payload: Any) -> None:
@@ -145,7 +165,7 @@ class HosmartDebugRecorder:
             try:
                 result.append(json.loads(line))
             except json.JSONDecodeError:
-                result.append({"kind": "unparseable_log_line", "raw": line.rstrip()})
+                result.append({"kind": "unparseable_log_line", "redacted": True, "length": len(line)})
         return result
 
     def tail_sync(self, lines: int = 1000) -> list[dict[str, Any]]:
